@@ -58,6 +58,22 @@ function landing() {
   }).catch(e => $('#recent').replaceChildren(h('span.err', friendlyError(e))));
 }
 
+// The room's hidden tastes are drawn in this browser and kept only here. This card shows the restore code on request (not on a projected screen by default)
+// or asks for it when this browser does not hold it.
+let showCode = false;
+function tasteCard() {
+  if (host.needsCode) {
+    return h('div.card', h('h2', 'Enter the room taste code'),
+      h('p', 'This browser does not hold the hidden market tastes for ' + host.gid + '. Type the 8-character restore code you wrote down when the game was created.'),
+      h('div.row', h('input#f-code', { type: 'text', placeholder: '4K7Q-X2M9', style: 'width:140px;font:700 18px monospace;text-transform:uppercase' }),
+        h('button.primary', { onclick: () => { try { host.restore($('#f-code').value); toast('Restored'); render(); } catch (e) { toast(e.message, 7000); } } }, 'Restore')));
+  }
+  return h('div.card', h('h2', 'Room taste code'),
+    h('p.small.muted', 'The hidden tastes for this room were drawn in this browser and are not stored on any server. Write the code down once. If this browser is cleared, or you host from another laptop, type it back in. Do not show this page on the projector while the code is open.'),
+    h('div.row', showCode ? h('b', { style: 'font:700 22px monospace;letter-spacing:2px' }, host.restoreCode) : h('span.muted', 'hidden'),
+      h('button.small', { onclick: () => { showCode = !showCode; render(); } }, showCode ? 'Hide code' : 'Show code')));
+}
+
 function copyBtn(text, label) { return h('button.small', { onclick: () => { navigator.clipboard && navigator.clipboard.writeText(text); toast('Copied'); } }, label); }
 
 function teamTable() {
@@ -82,7 +98,7 @@ function render() {
   const secs = g.clock ? Math.max(0, g.clock.endsAt - Date.now()) : 0;
   const ctrl = [];
   if (phase === 'lobby') {
-    ctrl.push(h('button.primary', { disabled: busy, onclick: () => guard(() => host.start()) }, 'Start game (season 1)'));
+    ctrl.push(h('button.primary', { disabled: busy || host.needsCode, onclick: () => guard(() => host.start()) }, 'Start game (season 1)'));
     ctrl.push(h('button', { disabled: busy || host.teams.filter(t => t.house).length >= HOUSE.maxCount, onclick: () => guard(() => host.addHouse()) }, 'Add a house (AI) team'));
     ctrl.push(h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: !!g.settings.botFill,
       onchange: ev => guard(async () => { await store.patchGame(g.id, { settings: { ...g.settings, botFill: ev.target.checked } }); }) }), 'Bot-fill teams nobody joined'));
@@ -109,6 +125,7 @@ function render() {
       h('div.card', h('h2', 'Links'),
         h('div.kv', h('span', 'Students (team page)'), h('span', h('a', { href: teamUrl(), target: '_blank' }, teamUrl()), ' ', copyBtn(teamUrl(), 'Copy')),
           h('span', 'Projector'), h('span', h('a', { href: projUrl(), target: '_blank' }, projUrl()), ' ', copyBtn(projUrl(), 'Copy')))),
+      tasteCard(),
       h('div.card', h('h2', 'Run'), h('div.row', ctrl), busy ? h('p.muted', 'Working...') : null),
       h('div.card', h('h2', 'Teams'), teamTable(),
         h('p.small.muted', 'Students open the team page, type their team code and a name. Up to five seats per team. House teams are scripted, labelled HOUSE and left out of the prize ranking. Teams nobody joins are dropped at Start unless bot-fill is on.'))));

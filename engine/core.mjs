@@ -19,8 +19,8 @@ import * as MK from '../config/markets.js';
 import { ROWS, tileLabel, tileIds } from '../config/tiles.js';
 import { BRAND_BY_ID, dnaState } from '../config/brands.js';
 import * as R from '../config/rules.js';
-import { EVENTS, drawDeck } from '../config/events.js';
-import { CLUE_CARDS, clueFor } from '../config/clues.js';
+import { EVENTS, drawDeck, renderEvent } from '../config/events.js';
+import { CLUE_CARDS, clueFor, clueText } from '../config/clues.js';
 
 const { MARKET_IDS } = MK;
 const r6 = x => Math.round(x * 1e6) / 1e6;
@@ -86,7 +86,23 @@ export function publicConfig(cfg) {
 }
 
 // ---------- game setup ----------
-export function createGame({ seed = 1, teams, seasons = R.SEASONS, startCash = R.BUDGET.startCash }) {
+// The room's hidden tastes ({market: {cut, palette, logo, fabric}}) live on state.secret, which is NON-enumerable: JSON.stringify(state), clone()
+// and every snapshot the host saves leave it out. They are never part of cfg, teamView, publicConfig or any table. A host that reloads a saved state
+// must call attachTastes(state, tastes) with the draw it kept in its own browser.
+export function attachTastes(state, tastes) {
+  for (const m of MARKET_IDS) for (const r of ROWS) {
+    if (!tastes || !tastes[m] || !tileIds(r).includes(tastes[m][r])) throw new Error('tastes missing or invalid for ' + m + ' ' + r);
+  }
+  Object.defineProperty(state, 'secret', { value: { tastes: clone(tastes) }, enumerable: false, writable: true, configurable: true });
+  return state;
+}
+const allTastes = state => {
+  if (!state.secret) throw new Error('This game has no tastes attached. Enter the restore code on the host page.');
+  return state.secret.tastes;
+};
+const tasteOf = (state, m) => allTastes(state)[m];
+
+export function createGame({ seed = 1, teams, seasons = R.SEASONS, startCash = R.BUDGET.startCash, tastes }) {
   const state = {
     gameId: 'WW-' + seed, seed, rng: (seed ^ 0x9E3779B9) >>> 0, seasons, season: 0, phase: 'setup',
     cfg: baseConfig(), cards: [], deck: drawDeck(seed, seasons),
@@ -104,6 +120,7 @@ export function createGame({ seed = 1, teams, seasons = R.SEASONS, startCash = R
     state.teams[t.id] = t; state.order.push(t.id);
     state.tables.ww_brands.push({ game_id: state.gameId, team_id: t.id, brand_id: b.id, name: t.name, free_tiles: b.free, costly_tile: b.costly, start_cash: startCash, house: t.house });
   }
+  attachTastes(state, tastes);
   for (const id of state.order) for (const m of MARKET_IDS) {
     const t = state.teams[id];
     for (const row of MK.MARKETS[m].revealOrder.slice(0, MK.startVisible(m))) revealRow(state, t, m, row, 'start');
@@ -122,7 +139,7 @@ function revealRow(state, t, m, row, source, extra = {}) {
   const base = MK.MARKETS[m];
   if (!row) row = base.revealOrder.find(r => !t.known[m][r]);
   if (!row || t.known[m][row]) return null;
-  const rec = { tile: base.taste[row], tier: MK.weightTier(state.cfg.MARKETS[m].weights[row]), source, season: state.season };
+  const rec = { tile: tasteOf(state, m)[row], tier: MK.weightTier(state.cfg.MARKETS[m].weights[row]), source, season: state.season };
   t.known[m][row] = rec;
   log(state, { team: t.id, market: m, type: 'fog',
     text: t.name + ' learned the ' + row + ' row in ' + base.name + ' (' + source + '): ' + tileLabel(row, rec.tile) + ', ' + rec.tier + ' weight',
@@ -141,7 +158,7 @@ export function beginSeason(state) {
   state.phase = 'open';
   state.offers = state.offers.filter(o => o.applies === s);
   state.cards.forEach((id, i) => {
-    const ev = EVENTS.find(e => e.id === id);
+    const ev = renderEvent(EVENTS.find(e => e.id === id), allTastes(state));
     log(state, { type: 'event', market: ev.markets.length === 1 && ev.markets[0] !== 'all' ? ev.markets[0] : null,
       text: ev.headline + ' (' + ev.rule + ')', payload: { card: id, slot: i + 1, headline: ev.headline, rule: ev.rule, mods: ev.effect.mods, season: s } });
   });
@@ -155,11 +172,11 @@ export function beginSeason(state) {
         for (const m of MARKET_IDS) for (const row of ROWS) if (!t.known[m][row]) open.push({ m, row });
         if (!open.length) break;
         const c = pick(state, open), card = clueFor(c.m, c.row);
-        revealRow(state, t, c.m, c.row, 'clue', { card: card ? card.id : null, text: card ? card.text : '' });
+        revealRow(state, t, c.m, c.row, 'clue', { card: card ? card.id : null, text: card ? clueText(c.m, c.row, tasteOf(state, c.m)[c.row]) : '' });
       }
     }
   }
-  return { season: s, cards: state.cards.map(id => EVENTS.find(e => e.id === id)) };
+  return { season: s, cards: state.cards.map(id => renderEvent(EVENTS.find(e => e.id === id), allTastes(state))) };
 }
 
 // ---------- fit, designs, costs ----------
@@ -167,9 +184,9 @@ export const designKey = d => ROWS.map(r => d[r]).join('/');
 // How much of the product buyers will accept when it does not match their taste. tolerance 0 = only fit counts (high pressure for local
 // responsiveness, Bartlett and Ghoshal); tolerance near 1 = a global product sells (low pressure). Fit shown to teams stays the raw tile match.
 export const effFit = (marketCfg, fit) => { const t = marketCfg.tolerance || 0; return t + (1 - t) * fit; };
-export function fitOf(marketCfg, d) {
+export function fitOf(marketCfg, d, taste) {
   let f = 0;
-  for (const r of ROWS) if (d[r] === marketCfg.taste[r]) f += marketCfg.weights[r];
+  for (const r of ROWS) if (d[r] === taste[r]) f += marketCfg.weights[r];
   return r6(f);
 }
 export function designDna(brandId, d) {
@@ -306,7 +323,7 @@ export function teamView(state, teamId) {
     tilesKnown: Object.fromEntries(MARKET_IDS.map(m => [m, knownCount(t, m)])),
     active: { ...t.active }, owned: { ...t.owned },
     receivables: clone(t.receivables),
-    events: state.cards.map(id => { const e = EVENTS.find(x => x.id === id); return { id, headline: e.headline, rule: e.rule }; }),
+    events: state.cards.map(id => { const e = renderEvent(EVENTS.find(x => x.id === id), allTastes(state)); return { id, headline: e.headline, rule: e.rule }; }),
     publicWinners: clone(state.publicWinners),
     lastSeats: last ? clone(last.seats) : {},
     lastCrowd: last ? Object.fromEntries(MARKET_IDS.map(m => [m, last.markets[m].crowd])) : {},
@@ -501,7 +518,7 @@ export function resolveSeason(state, subs = {}) {
       const taxRate = pm.taxBySeason[Math.min(prior, pm.taxBySeason.length - 1)] * ((mode === 'partner' || mode === 'carried') ? cfg.PARTNER_TAX_CUT : 1);
       const ownFirst = mode === 'own' && !t.owned[m];
       const reach = ((mode === 'carried' ? cfg.SHARE.reach.carried : cfg.SHARE.reach[mode]) + (mode === 'ship' ? (pm.shipReachBonus || 0) : 0)) * (ownFirst ? cfg.MODES.own.ownRampFirstSeason : 1);
-      let fit = fitOf(pm, des.tiles);
+      let fit = fitOf(pm, des.tiles, tasteOf(state, m));
       const key = designKey(des.tiles);
       let knocked = false;
       const ko = state.knockoffs[m] && state.knockoffs[m][key];

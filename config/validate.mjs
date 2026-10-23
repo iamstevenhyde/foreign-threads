@@ -3,7 +3,9 @@ import { MARKETS, MARKET_IDS, startVisible } from './markets.js';
 import { TILES, ROWS, GARMENT_FILES, tileIds } from './tiles.js';
 import { BRANDS, dnaState } from './brands.js';
 import * as R from './rules.js';
-import { CLUE_CARDS } from './clues.js';
+import { CLUE_CARDS, clueText } from './clues.js';
+import { TILE_PHRASE } from './tiles.js';
+import { drawTastes, seededInt, codeFromTastes, tastesFromCode } from './taste.js';
 import { tileLabel } from './tiles.js';
 
 let bad = 0;
@@ -13,7 +15,7 @@ const ok = (c, m) => { if (!c) fail(m); };
 for (const id of MARKET_IDS) {
   const m = MARKETS[id];
   ok(Math.abs(ROWS.reduce((s, r) => s + m.weights[r], 0) - 1) < 1e-9, id + ' weights sum to 1');
-  ok(ROWS.every(r => tileIds(r).includes(m.taste[r])), id + ' taste tiles exist');
+  ok(m.taste === undefined, id + ' carries no taste (tastes are drawn per room, config/taste.js)');
   ok(m.revealOrder.length === 4 && new Set(m.revealOrder).size === 4, id + ' revealOrder is a permutation');
   ok(m.taxBySeason.length === R.SEASONS, id + ' tax has one number per season');
   ok(startVisible(id) === 4 - m.distance, id + ' start visible');
@@ -37,15 +39,26 @@ ok(Object.values(TILES).every(a => a.length >= 4), 'every row has at least four 
 ok(R.RUNS.sizes.every(s => R.RUNS.unitCost[s] > 0), 'unit cost for every run size');
 ok(R.DESIGN.extraFee.length === R.DESIGN.maxPerSeason && R.DESIGN.unitCostMultiplier.length === R.DESIGN.maxPerSeason, 'design curves match maxPerSeason');
 
-// Clue cards: one per (market, row), each names its market and row, is marked draft, and names the true taste tile.
+// Clue cards: one per (market, row), each names its market and row, is marked draft, and reads for every possible tile.
 ok(CLUE_CARDS.length === MARKET_IDS.length * ROWS.length, 'one clue card per market row');
 ok(new Set(CLUE_CARDS.map(c => c.market + '/' + c.row)).size === CLUE_CARDS.length, 'clue cards are unique per market row');
 for (const c of CLUE_CARDS) {
   const m = MARKETS[c.market];
   ok(m && ROWS.includes(c.row), c.id + ' names a real market and row');
   if (!m || !ROWS.includes(c.row)) continue;
-  ok(c.draft === true && typeof c.text === 'string' && c.text.length > 0, c.id + ' is draft text');
-  ok(c.text.toLowerCase().includes(tileLabel(c.row, m.taste[c.row]).toLowerCase()) || c.text.toLowerCase().includes(m.taste[c.row]), c.id + ' names the true taste tile');
+  ok(c.draft === true, c.id + ' is draft text');
+  ok(tileIds(c.row).every(t => TILE_PHRASE[c.row][t] && clueText(c.market, c.row, t).length > 0), c.id + ' reads for every tile of its row');
+}
+// Taste draws: the restore code round-trips and rejects a mistyped character.
+for (let k = 1; k <= 200; k++) {
+  const t = drawTastes(seededInt(k)), c = codeFromTastes(t);
+  ok(JSON.stringify(tastesFromCode(c)) === JSON.stringify(t), 'restore code round-trips (draw ' + k + ')');
+}
+{
+  const c = codeFromTastes(drawTastes(seededInt(7))).replace('-', '');
+  let threw = false;
+  try { tastesFromCode(c.slice(0, 3) + (c[3] === '2' ? '3' : '2') + c.slice(4)); } catch (e) { threw = true; }
+  ok(threw, 'a mistyped restore code is refused');
 }
 // House block: three personalities, order only names real ones, counts sane.
 ok(R.HOUSE && R.HOUSE.defaultCount <= R.HOUSE.maxCount, 'house counts');

@@ -56,3 +56,12 @@ export const SCENE_FILES = {
   lobby: 'wk10_lobby.png',
   runway: 'wk10_runway.png',
 };
+
+// How a tile reads in a sentence ("shoppers choose ..."). Used by clue cards and the news cards that reveal a row, so their text follows the
+// room's drawn taste instead of naming a fixed tile in the repo.
+export const TILE_PHRASE = {
+  cut: { puffer: 'puffer jackets', shell: 'technical shell jackets', hoodie: 'hoodies', resort: 'resort shirts', denim: 'denim jackets' },
+  palette: { earth: 'earth colours', black: 'black', bright: 'bright colours', pastel: 'pastel colours' },
+  logo: { big: 'a big logo', small: 'a small logo', none: 'no logo', allover: 'an all-over print' },
+  fabric: { heavy: 'heavy fabric', light: 'light fabric', performance: 'performance fabric', recycled: 'recycled fabric' },
+};

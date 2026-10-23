@@ -3,17 +3,34 @@
 // Snapshots (ww_snapshots): kind 'state' round 0 (full engine state, so an admin reload resumes), 'view' per team per season (teamView at season open),
 // 'public' per season (news + roster), 'reveal' per season (what the projector may show), 'result' per team per season (private results), 'final'.
 
-import { createGame, beginSeason, teamView, resolveSeason, makeOffers, standings, exportTables, rand } from '../engine/core.mjs';
+import { createGame, attachTastes, beginSeason, teamView, resolveSeason, makeOffers, standings, exportTables, rand } from '../engine/core.mjs';
 import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from '../engine/bots.mjs';
 import { BRANDS } from '../config/brands.js';
 import { HOUSE, CLOCK, SEASONS } from '../config/rules.js';
 import { MARKET_IDS } from '../config/markets.js';
 import { makeCode, makeGameId } from './util.js';
+import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js';
+import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs';
+
+// The room's hidden tastes never go to the store (Supabase or local) and never into a snapshot. They live in this browser's localStorage under the
+// room id, and the host writes down the short restore code (config/taste.js) so a cleared browser or a second laptop can pick the room up again.
+const secretKey = gid => 'ft:tastes:' + gid;
+const readSecret = gid => { try { const c = localStorage.getItem(secretKey(gid)); return c ? tastesFromCode(c) : null; } catch (e) { return null; } };
+const writeSecret = (gid, tastes) => { try { localStorage.setItem(secretKey(gid), codeFromTastes(tastes)); } catch (e) { console.warn('could not keep the taste code in this browser', e); } };
 
 const PUBLIC_EVENT_TYPES = new Set(['copy', 'suit', 'street']);
 
 export class Host {
-  constructor(store) { this.store = store; this.game = null; this.teams = []; this.state = null; this.meta = null; this.busy = false; }
+  constructor(store) { this.store = store; this.game = null; this.teams = []; this.state = null; this.meta = null; this.busy = false; this.tastes = null; }
+
+  get needsCode() { return !this.tastes; }
+  get restoreCode() { return this.tastes ? codeFromTastes(this.tastes) : ''; }
+  // The host typed the restore code (new laptop or cleared browser).
+  restore(code) {
+    const tastes = tastesFromCode(code);
+    this.tastes = tastes; writeSecret(this.gid, tastes);
+    if (this.state) attachTastes(this.state, tastes);
+  }
 
   get gid() { return this.game.id; }
   get season() { return this.state ? this.state.season : 0; }
@@ -39,6 +56,8 @@ export class Host {
     for (const r of rows) await store.upsertTeam(r);
     const host = new Host(store);
     await host.load(gid);
+    host.tastes = drawTastes(secureInt, [REFERENCE_TASTES]);   // fresh per room, from the browser's crypto source; never sent anywhere
+    writeSecret(gid, host.tastes);
     return host;
   }
 
@@ -48,6 +67,8 @@ export class Host {
     this.teams = await this.store.getTeams(gid);
     const snap = (await this.store.getSnapshots(gid, { kind: 'state' }))[0];
     if (snap) { this.state = snap.data.state; this.meta = snap.data.meta; } else { this.state = null; this.meta = null; }
+    this.tastes = readSecret(gid);
+    if (this.state && this.tastes) attachTastes(this.state, this.tastes);
     return this;
   }
   async refreshGame() { this.game = await this.store.getGame(this.gid); this.teams = await this.store.getTeams(this.gid); return this.game; }
@@ -80,6 +101,7 @@ export class Host {
   async start() {
     await this.refreshGame();
     if (this.game.phase !== 'lobby') throw new Error('The game has already started.');
+    if (!this.tastes) throw new Error('This browser does not hold the room taste code. Enter the restore code first.');
     const claimed = await this.claimedTeams();
     const specs = [], bots = {}, humans = [], dropped = [], aiTeams = [];
     let k = 0;
@@ -90,7 +112,7 @@ export class Host {
       else dropped.push(t.team_id);
     }
     if (specs.length < 2) throw new Error('Need at least two teams. Have students join, add house teams, or turn on bot fill.');
-    this.state = createGame({ seed: this.game.seed, teams: specs, seasons: this.game.settings.seasons || SEASONS });
+    this.state = createGame({ seed: this.game.seed, teams: specs, seasons: this.game.settings.seasons || SEASONS, tastes: this.tastes });
     this.meta = { bots, humans, dropped, autoSubs: {}, resultsPublished: 0 };
     await this._patch({ settings: { ...this.game.settings, aiTeams, active: specs.map(s => s.id) } });
     await this.openSeason();
@@ -208,7 +230,7 @@ export class Host {
 
   exportRun() {
     const st = this.state;
-    return { seed: st.seed, teams: st.order.length, house: st.order.filter(id => st.teams[id].house).length, seasons: st.seasons,
+    return { seed: st.seed, taste_code: this.restoreCode, teams: st.order.length, house: st.order.filter(id => st.teams[id].house).length, seasons: st.seasons,
       strategies: Object.fromEntries(Object.values(this.meta.bots).map(b => [b.id, b.house ? 'house:' + b.personality : b.strategy])),
       ...exportTables(st), results: st.history, ranking: standings(st) };
   }

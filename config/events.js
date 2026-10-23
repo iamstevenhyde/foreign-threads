@@ -6,12 +6,26 @@
 // op 'grant' on FOG.clueCardReveals (clue cards): shows that taste row (tile and weight tier) to every team, and the teams keep the knowledge.
 // teaches: oli | distance | control | integration | voids.  art: file under art/ or null; needsArt holds a prompt when art is null.
 
+import { TILE_PHRASE } from './tiles.js';
+
+// Cards that reveal a taste row to every team carry a `render(tile ids of that market)` that writes the headline, standfirst and body from the
+// room's drawn tile. Their static text is a placeholder that names no tile, so the repo holds no market's taste. Every other card is tile-neutral.
+const cap = s => s.replace(/\b\w/g, c => c.toUpperCase());
+export function renderEvent(ev, tastes) {
+  if (!ev.render || !tastes) return ev;
+  return { ...ev, ...ev.render(tastes[ev.markets[0]]) };
+}
+
 export const EVENTS = [
   {
     id: 'EV01', seasons: [1], pinned: 1, markets: ['tokyo'], teaches: 'distance', secondary: 'integration',
-    headline: 'Tokyo Buyers Keep Asking For Smaller Logos',
-    standfirst: 'A store survey finds shoppers turning away from big marks on the chest.',
-    body: 'Floor staff at three Tokyo department stores told our correspondent that shoppers keep handing back anything with a large mark on the chest. One buyer said a discreet badge outsold the same jacket carrying a loud one almost two to one. Foreign labels that arrived with oversized logos are quietly restocking, while local houses barely changed a stitch. The pattern looks settled. (Loom Wire)',
+    headline: 'Tokyo Buyers Settle On A Logo Style',
+    standfirst: 'A store survey finds shoppers agreeing on what belongs on the chest.',
+    body: 'Floor staff at three Tokyo department stores told our correspondent that shoppers have settled on a logo style. (Loom Wire)',
+    render: t => ({
+      headline: 'Tokyo Buyers Keep Reaching For ' + cap(TILE_PHRASE.logo[t.logo].replace(/^an? /, '')),
+      standfirst: 'A store survey finds shoppers settling on ' + TILE_PHRASE.logo[t.logo] + '.',
+      body: 'Floor staff at three Tokyo department stores told our correspondent that shoppers keep reaching for ' + TILE_PHRASE.logo[t.logo] + ' and handing back almost everything else. One buyer said the favoured style outsold the nearest alternative almost two to one. Foreign labels that arrived with something different are quietly restocking, while local houses barely changed a stitch. The pattern looks settled. (Loom Wire)' }),
     rule: 'The Tokyo logo row is revealed to every team this season (tile and weight tier), and stays revealed.',
     numbers: 'FOG.clueCardReveals: grant for tokyo, row logo (third in revealOrder, hidden at the start because Tokyo distance is 2).',
     effect: { duration: 'season', mods: [{ path: 'FOG.clueCardReveals', op: 'grant', market: 'tokyo', row: 'logo' }] },
@@ -44,7 +58,7 @@ export const EVENTS = [
     id: 'EV04', seasons: [1, 2, 3, 4], pinned: null, markets: ['berlin'], teaches: 'integration', secondary: 'oli',
     headline: 'Berlin Stores Ask Where The Cloth Came From',
     standfirst: 'Buyers are reading fabric labels before colour or cut.',
-    body: 'Berlin buyers are turning garments over to read the fabric label first, our shop-floor survey finds. A palette that sold last season now takes second place to what the garment is made of. Store managers say a recycled blend will be forgiven an awkward colour, while a fine colour on a plain fabric will not. Local firms were already ahead of this and are adding weight to the point. (Loom Wire)',
+    body: 'Berlin buyers are turning garments over to read the fabric label first, our shop-floor survey finds. A palette that sold last season now takes second place to what the garment is made of. Store managers say the right fabric will be forgiven an awkward colour, while a fine colour on the wrong fabric will not. Local firms were already ahead of this and are adding weight to the point. (Loom Wire)',
     rule: 'In Berlin this season fabric counts 0.55 of the fit and palette counts 0.15; cut and logo keep their weights.',
     numbers: 'MARKETS.berlin.weights.fabric: 0.40 becomes 0.55 (add 0.15). palette: 0.30 becomes 0.15 (add -0.15). cut 0.15 and logo 0.15 unchanged. Revealed weight tiers follow: fabric High, palette Medium.',
     effect: { duration: 'season', mods: [{ path: 'MARKETS.berlin.weights.fabric', op: 'add', value: 0.15 }, { path: 'MARKETS.berlin.weights.palette', op: 'add', value: -0.15 }] },
@@ -97,9 +111,9 @@ export const EVENTS = [
   },
   {
     id: 'EV09', seasons: [2, 3, 4], pinned: null, markets: ['tokyo'], teaches: 'integration', secondary: 'distance',
-    headline: 'Tokyo Turns From Logos To Quiet Colour',
-    standfirst: 'Shoppers drift from marked garments to a calm earth palette.',
-    body: 'A season of crowded streets has left Tokyo shoppers wanting less to look at. Buyers at several stores told us that colour is doing the talking now and the logo is being left out of the conversation. A calmer palette is moving faster than a marked chest, even where the cut is plain. Local houses were first, and the foreign labels are scrambling to follow. (Loom Wire)',
+    headline: 'Tokyo Shoppers Weigh Colour Above Logos',
+    standfirst: 'Shoppers drift from marked garments toward what colour says.',
+    body: 'A season of crowded streets has left Tokyo shoppers wanting less to look at. Buyers at several stores told us that colour is doing more of the talking now and the logo less. A garment in the right colour is moving faster than one with a marked chest, even where the cut is plain. Local houses were first, and the foreign labels are scrambling to follow. (Loom Wire)',
     rule: 'In Tokyo this season palette counts 0.25 of the fit and logo counts 0.20; cut and fabric keep their weights.',
     numbers: 'MARKETS.tokyo.weights.palette: 0.10 becomes 0.25 (add 0.15). logo: 0.35 becomes 0.20 (add -0.15). cut 0.35 and fabric 0.20 unchanged.',
     effect: { duration: 'season', mods: [{ path: 'MARKETS.tokyo.weights.palette', op: 'add', value: 0.15 }, { path: 'MARKETS.tokyo.weights.logo', op: 'add', value: -0.15 }] },
@@ -152,9 +166,13 @@ export const EVENTS = [
   },
   {
     id: 'EV14', seasons: [1, 2, 3], pinned: null, markets: ['saopaulo'], teaches: 'distance', secondary: 'integration',
-    headline: 'Sao Paulo Buyers Ask For Lighter Cloth In The Heat',
-    standfirst: 'A heatwave sends shoppers to light fabric across the city.',
-    body: 'A week of heat in Sao Paulo has sent shoppers to the lightest fabric on the rail, according to store buyers. One chain said light cotton blends sold through in a morning while heavier pieces were left on the hangers. The preference is not a passing fad, one stylist said, since local houses have favoured light cloth for as long as anyone can remember. Foreign labels have noticed the pattern. (Loom Wire)',
+    headline: 'Sao Paulo Buyers Settle On A Fabric',
+    standfirst: 'Store buyers say shoppers have agreed on the cloth they want.',
+    body: 'Store buyers in Sao Paulo say shoppers have settled on a fabric. (Loom Wire)',
+    render: t => ({
+      headline: 'Sao Paulo Buyers Settle On ' + cap(TILE_PHRASE.fabric[t.fabric]),
+      standfirst: 'Store buyers say shoppers are choosing ' + TILE_PHRASE.fabric[t.fabric] + ' across the city.',
+      body: 'A season of talk on the Sao Paulo shop floor has settled on one point, according to store buyers: shoppers are choosing ' + TILE_PHRASE.fabric[t.fabric] + ' ahead of anything else on the rail. One chain said the favoured cloth sold through in a morning while the rest was left on the hangers. The preference is not a passing fad, one stylist said, since local houses have favoured it for as long as anyone can remember. Foreign labels have noticed the pattern. (Loom Wire)' }),
     rule: 'The Sao Paulo fabric row is revealed to every team this season (tile and weight tier), and stays revealed.',
     numbers: 'FOG.clueCardReveals: grant for saopaulo, row fabric (third in revealOrder, hidden at the start because Sao Paulo distance is 2).',
     effect: { duration: 'season', mods: [{ path: 'FOG.clueCardReveals', op: 'grant', market: 'saopaulo', row: 'fabric' }] },
@@ -174,9 +192,13 @@ export const EVENTS = [
   },
   {
     id: 'EV16', seasons: [1, 2], pinned: null, markets: ['nairobi'], teaches: 'distance', secondary: 'voids',
-    headline: 'Nairobi Market Day Leans To Big Marks And Heavy Cloth',
-    standfirst: 'Stallholders say shoppers want a mark they can see from across the lane.',
-    body: 'On Nairobi market day, stallholders say the garments that go first carry a big, bold mark visible from across the lane. Shoppers feel the cloth between their fingers before they look at anything else, and heavy fabric wins the argument. Our correspondent found nothing like it on the rails in any other city she visited. A research firm would charge for such news if one existed here. (Loom Wire)',
+    headline: 'Nairobi Market Day Settles On A Logo Style',
+    standfirst: 'Stallholders say shoppers know what they want on the chest.',
+    body: 'On Nairobi market day, stallholders say one logo style goes first. (Loom Wire)',
+    render: t => ({
+      headline: 'Nairobi Market Day Favours ' + cap(TILE_PHRASE.logo[t.logo].replace(/^an? /, '')),
+      standfirst: 'Stallholders say shoppers know what they want on the chest.',
+      body: 'On Nairobi market day, stallholders say the garments that go first carry ' + TILE_PHRASE.logo[t.logo] + ', and shoppers pass over the rest. Our correspondent found nothing like it on the rails in any other city she visited. A research firm would charge for such news if one existed here. (Loom Wire)' }),
     rule: 'The Nairobi logo row is revealed to every team this season (tile and weight tier), and stays revealed.',
     numbers: 'FOG.clueCardReveals: grant for nairobi, row logo (second in revealOrder, hidden at the start because Nairobi distance is 3). There is no research firm in Nairobi (MARKETS.nairobi.rules.research is false), so this is the only free source.',
     effect: { duration: 'season', mods: [{ path: 'FOG.clueCardReveals', op: 'grant', market: 'nairobi', row: 'logo' }] },

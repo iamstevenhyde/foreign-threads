@@ -3,7 +3,7 @@
 // Numbers are starting values for the Saturday bot balance run on bede; the engine reads them, nothing here is code.
 
 // weights over [cut, palette, logo, fabric] sum to 1. Fit = sum of the weights of the rows a design matches.
-// taste: the preferred tile per row (hidden from teams until revealed).
+// The preferred tile per row (the 'taste') is NOT here. It is drawn fresh for each room on the host page (config/taste.js) and never ships in this repo.
 // distance: 1 to 3, sets how many of the four taste rows start hidden (fog).
 // revealOrder: the order rows become visible, first row shown first. Visible at the start = 4 - distance rows.
 // When a row is revealed the team sees the tile and a weight tier: High (>= 0.30), Medium (0.15 to 0.29), Low (< 0.15).
@@ -21,14 +21,13 @@
 // shipReachBonus: added to the Ship reach in this market (a near, integrated market is reached by ship almost as well as by a partner; CAGE distance lowers it).
 // pressure / tolerance: pressure for local responsiveness (Bartlett and Ghoshal). tolerance is how much of the product buyers accept without a taste match:
 //   share weight uses effective fit = tolerance + (1 - tolerance) x fit. Low pressure (high tolerance): a global product sells. High pressure: only fit sells.
-// incumbent: the local firm, never on a leaderboard. Its garment is the market's taste exactly, discounted to incumbent.fit.
+// incumbent: the local firm, never on a leaderboard. Its garment is the room's drawn taste exactly, discounted to incumbent.fit.
 
 export const MARKET_IDS = ['berlin', 'tokyo', 'saopaulo', 'nairobi'];
 
 export const MARKETS = {
   berlin: {
     id: 'berlin', pressure: 'low', tolerance: 0.9, shipReachBonus: 0.5, name: 'Berlin', distance: 1,
-    taste: { cut: 'shell', palette: 'black', logo: 'none', fabric: 'recycled' },
     weights: { cut: 0.15, palette: 0.30, logo: 0.15, fabric: 0.40 },
     revealOrder: ['fabric', 'palette', 'cut', 'logo'],
     taxBySeason: [0.12, 0.07, 0.025, 0.01],
@@ -39,7 +38,6 @@ export const MARKETS = {
   },
   tokyo: {
     id: 'tokyo', pressure: 'high', tolerance: 0.1, name: 'Tokyo', distance: 2,
-    taste: { cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' },
     weights: { cut: 0.35, palette: 0.10, logo: 0.35, fabric: 0.20 },
     revealOrder: ['cut', 'fabric', 'logo', 'palette'],
     taxBySeason: [0.18, 0.1, 0.05, 0.02],
@@ -50,18 +48,16 @@ export const MARKETS = {
   },
   saopaulo: {
     id: 'saopaulo', pressure: 'high', tolerance: 0.1, name: 'Sao Paulo', distance: 2,
-    taste: { cut: 'resort', palette: 'bright', logo: 'allover', fabric: 'light' },
     weights: { cut: 0.25, palette: 0.35, logo: 0.20, fabric: 0.20 },
     revealOrder: ['palette', 'cut', 'fabric', 'logo'],
     taxBySeason: [0.11, 0.06, 0.03, 0.01],
     rules: { research: true, court: true, suitOnCopy: false, streetCopy: false, dutyShipped: 0.4, paymentLagSeasons: 1, modes: ['ship', 'partner', 'own'], partnerWalks: false },
     incumbent: { name: 'Rua Viva', fit: 0.65, price: 'standard' },
     priceFit: { value: 1.1, standard: 1.0, premium: 0.8 },
-    blurb: 'Administrative distance. 35% duty on goods you ship in; payments arrive a season late.',
+    blurb: 'Administrative distance. 40% duty on goods you ship in; payments arrive a season late.',
   },
   nairobi: {
     id: 'nairobi', pressure: 'high', tolerance: 0.1, name: 'Nairobi', distance: 3,
-    taste: { cut: 'hoodie', palette: 'pastel', logo: 'big', fabric: 'heavy' },
     weights: { cut: 0.20, palette: 0.15, logo: 0.25, fabric: 0.40 },
     revealOrder: ['fabric', 'logo', 'cut', 'palette'],
     taxBySeason: [0.43, 0.215, 0.09, 0.03],

@@ -7,12 +7,22 @@ import { fileURLToPath } from 'node:url';
 import { BRANDS } from '../config/brands.js';
 import { HOUSE, POOLS } from '../config/rules.js';
 import { MARKET_IDS, MARKETS } from '../config/markets.js';
+import { REFERENCE_TASTES } from './reference_tastes.mjs';
+import { drawTastes, seededInt, tastesFromCode, codeFromTastes } from '../config/taste.js';
 import { createGame, beginSeason, teamView, resolveSeason, makeOffers, exportTables, finalRanking, rand } from './core.mjs';
 import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from './bots.mjs';
 
 function arg(name, def) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : def; }
 
-export function playGame({ seed, teams, house, seasons, quiet = false, poolScale = 1, overrides = {} }) {
+// Headless tastes: 'seed' (default) draws a room from the game seed, 'ref' is the fixed pre-10/23 table (balance comparisons), or pass a restore code.
+// FT_TASTE in the environment sets the default so the balance batch can run either way.
+export function tastesFor(seed, mode = process.env.FT_TASTE || 'seed') {
+  if (mode === 'ref') return REFERENCE_TASTES;
+  if (mode === 'seed') return drawTastes(seededInt(seed));
+  return tastesFromCode(mode);
+}
+
+export function playGame({ seed, teams, house, seasons, quiet = false, poolScale = 1, overrides = {}, taste }) {
   if (poolScale !== 1) for (const m of Object.keys(POOLS)) POOLS[m] = POOLS[m] * poolScale;   // experiment only: edit config/rules.js to keep a change
   if (house > HOUSE.maxCount || house > teams) throw new Error('house count must be at most ' + Math.min(HOUSE.maxCount, teams));
   // brands: a seeded shuffle of the twelve; humans-seats first, then the house takes brands nobody picked
@@ -23,7 +33,8 @@ export function playGame({ seed, teams, house, seasons, quiet = false, poolScale
   const players = teams - house;
   for (let i = 0; i < players; i++) seats.push({ id: 'T' + (i + 1), brandId: pool[i], house: false, strategy: STRATEGIES[i % STRATEGIES.length] });
   for (let i = 0; i < house; i++) seats.push({ id: 'T' + (players + i + 1), brandId: pool[players + i], house: true, personality: HOUSE.order[i] });
-  const state = createGame({ seed, teams: seats, seasons });
+  const tastes = tastesFor(seed, taste);
+  const state = createGame({ seed, teams: seats, seasons, tastes });
   const bots = Object.fromEntries(seats.map(s => [s.id, { id: s.id, strategy: s.strategy || null, personality: s.personality || null, house: s.house, mem: {} }]));
   const out = (...a) => { if (!quiet) console.log(...a); };
   out('game ' + state.gameId + ': ' + seats.map(s => state.teams[s.id].name + (s.house ? ' [HOUSE ' + s.personality + ']' : ' [' + s.strategy + ']')).join(', '));
@@ -61,10 +72,10 @@ export function playGame({ seed, teams, house, seasons, quiet = false, poolScale
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const seed = Number(arg('seed', 1)), teams = Number(arg('teams', 6)), house = Number(arg('house', 2)), seasons = Number(arg('seasons', 4));
   const outFile = arg('out', null);
-  const { state, rank, bots } = playGame({ seed, teams, house, seasons, poolScale: Number(arg('pool-scale', 1)) });
+  const { state, rank, bots } = playGame({ seed, teams, house, seasons, poolScale: Number(arg('pool-scale', 1)), taste: arg('taste', undefined) });
   if (outFile) {
     fs.mkdirSync(path.dirname(path.resolve(outFile)), { recursive: true });
-    const run = { seed, teams, house, seasons, strategies: Object.fromEntries(Object.values(bots).map(b => [b.id, b.house ? 'house:' + b.personality : b.strategy])),
+    const run = { seed, teams, house, seasons, taste_code: codeFromTastes(state.secret.tastes), strategies: Object.fromEntries(Object.values(bots).map(b => [b.id, b.house ? 'house:' + b.personality : b.strategy])),
       ...exportTables(state), results: state.history, ranking: rank };
     fs.writeFileSync(outFile, JSON.stringify(run, null, 1));
     console.log('wrote ' + outFile);

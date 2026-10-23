@@ -3,16 +3,17 @@ import * as R from '../config/rules.js';
 import * as MK from '../config/markets.js';
 import assert from 'node:assert/strict';
 import { MARKETS } from '../config/markets.js';
+import { REFERENCE_TASTES } from './reference_tastes.mjs';
 import { fitOf, designDna, costPlan, publicConfig, validatePlan } from './core.mjs';
 import { game, season, row, plan, line, lock, D, PERFECT, beginSeason } from './testkit.mjs';
 
 test('fit is the sum of the matched hidden taste weights', () => {
   const b = MARKETS.berlin;
-  assert.equal(fitOf(b, PERFECT.berlin), 1);
-  assert.equal(fitOf(b, D('shell', 'black', 'big', 'heavy')), 0.45);                  // cut 0.15 + palette 0.30
-  assert.equal(fitOf(b, D('puffer', 'pastel', 'big', 'heavy')), 0);
-  assert.equal(fitOf(b, D('puffer', 'pastel', 'none', 'recycled')), 0.55);            // logo 0.15 + fabric 0.40
-  assert.ok(Math.abs(fitOf(MARKETS.tokyo, PERFECT.tokyo) - 1) < 1e-9);
+  assert.equal(fitOf(b, PERFECT.berlin, REFERENCE_TASTES.berlin), 1);
+  assert.equal(fitOf(b, D('shell', 'black', 'big', 'heavy'), REFERENCE_TASTES.berlin), 0.45);                  // cut 0.15 + palette 0.30
+  assert.equal(fitOf(b, D('puffer', 'pastel', 'big', 'heavy'), REFERENCE_TASTES.berlin), 0);
+  assert.equal(fitOf(b, D('puffer', 'pastel', 'none', 'recycled'), REFERENCE_TASTES.berlin), 0.55);            // logo 0.15 + fabric 0.40
+  assert.ok(Math.abs(fitOf(MARKETS.tokyo, PERFECT.tokyo, REFERENCE_TASTES.tokyo) - 1) < 1e-9);
 });
 
 test('brand DNA: two free tiles cost nothing, the costly tile and any other tile cost the config surcharge', () => {
