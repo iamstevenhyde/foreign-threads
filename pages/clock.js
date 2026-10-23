@@ -44,17 +44,24 @@ export function resumeClock(c, now) {
   const { fullRemaining, ...rest } = c;
   return { ...rest, paused: false, endsAt: now + (c.remaining || 0), remaining: null, ...(c.early ? { fullEndsAt: now + (fullRemaining ?? c.remaining ?? 0) } : {}) };
 }
-export const addTime = (c, secs) => (!c ? c : c.paused ? { ...c, remaining: (c.remaining || 0) + secs * 1000, total: c.total + secs } : { ...c, endsAt: c.endsAt + secs * 1000, total: c.total + secs });
+// +30 s during the all-locked seconds also moves the full clock, so an unlock afterwards does not take the added time away.
+export function addTime(c, secs) {
+  if (!c) return c;
+  const ms = secs * 1000;
+  return c.paused ? { ...c, remaining: (c.remaining || 0) + ms, total: c.total + secs, ...(c.early ? { fullRemaining: (c.fullRemaining || 0) + ms } : {}) }
+    : { ...c, endsAt: c.endsAt + ms, total: c.total + secs, ...(c.early ? { fullEndsAt: c.fullEndsAt + ms } : {}) };
+}
 
 // Every human team has locked: the decision clock drops to a few seconds so the projector can say so before the reveal. If a team unlocks during
-// those seconds the full clock comes back.
+// those seconds the full clock comes back, paused or not. A paused clock is never shortened; the drop waits for Resume.
 export function earlyClock(c, secs, now) {
   if (!c || c.early || c.paused) return c;
   const endsAt = Math.min(c.endsAt, now + secs * 1000);
   return { ...c, early: true, fullEndsAt: c.endsAt, endsAt };
 }
 export function restoreClock(c, now) {
-  if (!c || !c.early || c.paused) return c;
-  const { early, fullEndsAt, ...rest } = c;
+  if (!c || !c.early) return c;
+  const { early, fullEndsAt, fullRemaining, ...rest } = c;
+  if (c.paused) return { ...rest, remaining: Math.max(fullRemaining ?? 0, c.remaining || 0) };
   return { ...rest, endsAt: Math.max(fullEndsAt, now) };
 }

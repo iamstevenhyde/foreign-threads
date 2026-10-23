@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { CLOCK } from '../config/rules.js';
 import { drawTastes, seededInt, codeFromTastes } from '../config/taste.js';
 import { stepKey, stepSeconds, gamePlan, clockLeft, isDue, newClock, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from '../pages/clock.js';
+import { every } from '../pages/ticker.js';
+import { teamView } from './core.mjs';
 import { D, line, plan } from './testkit.mjs';
 
 // ---- the host in Node: a localStorage shim stands in for the browser (same set-up as secrecy.test.mjs) ----
@@ -42,9 +44,9 @@ const planLog = (host, id, s) => host.state.tables.ww_log.find(e => e.type === '
 test('clock arithmetic: the configured steps add up to the game length the lobby prints', () => {
   const p = gamePlan(CLOCK, 4, 1);
   assert.equal(p.steps.length, 24, '4 seasons x (decide + 4 markets + recap)');
-  const expect = (300 + 4 * 60 + 90) + 2 * (240 + 4 * 60 + 90) + (240 + 4 * 60 + 45);
+  const expect = (300 + 4 * 60 + 120) + 2 * (240 + 4 * 60 + 120) + (240 + 4 * 60 + 45);
   assert.equal(p.total, expect);
-  assert.equal(p.total, 2295, '38:15 with no early locks');
+  assert.equal(p.total, 2385, '39:45 with no early locks, inside the 41:00 slot');
   assert.equal(gamePlan(CLOCK, 4, 0.5).total, p.steps.reduce((a, x) => a + Math.max(5, Math.round(x.seconds * 0.5)), 0));
   assert.equal(stepSeconds(CLOCK, { phase: 'reveal', season: 4, seasons: 4, idx: 4 }, 1), CLOCK.finalRecapSeconds);
   assert.equal(stepSeconds(CLOCK, { phase: 'decide', season: 1, seasons: 4 }, 0.01), 5, 'never under five seconds');
@@ -91,7 +93,7 @@ test('after Start, zero clicks: the clock alone runs four seasons to the final r
   for (let s = 1; s <= 4; s++) {
     expect.push(['decide:' + s, s === 1 ? 300 : 240]);
     for (let i = 0; i < 4; i++) expect.push(['reveal:' + s + ':' + i, 60]);
-    expect.push(['reveal:' + s + ':4', s === 4 ? 45 : 90]);
+    expect.push(['reveal:' + s + ':4', s === 4 ? 45 : 120]);
   }
   assert.deepEqual(seen, expect);
   assert.equal(host.game.clock, null, 'the final ranking has no clock');
@@ -252,22 +254,192 @@ test('no double step: two ticks at once advance once, and a second host tab that
   assert.equal(other.due(), false, 'a laptop without the taste code never runs the engine on the clock');
 });
 
-test('the clock changes when things happen, never what happens: a game run on the clock equals the same game run with Skip', async () => {
-  const play = async (useClock) => {
-    const { host, clock, store } = await room({ humans: 2, house: 2, seed: 9 });
-    await host.start();
-    while (host.game.phase !== 'final') {
-      if (host.game.phase === 'decide') {
-        const s = host.game.round;
-        await store.patchDecision(host.gid, 'T1', s, { plan: ok(), locked: true });
-        if (s % 2) await store.patchDecision(host.gid, 'T2', s, { plan: ok([D('denim', 'earth', 'small', 'light')]) });
-      }
-      if (useClock) await runOut(host, clock); else await host.advance();
+// One scripted game: T1 bids for the Berlin partner seat and locks; T2 saves an unlocked plan in odd seasons and offers T1 a carry in Berlin at each
+// recap. `inject` lists store calls that fail once each; after a failure the driver simply tries the step again, as the admin tick does 5 s later.
+async function playGame({ useClock, inject = [] }) {
+  const { host, clock, store } = await room({ humans: 2, house: 2, seed: 9 });
+  const fired = [];
+  for (const r of inject) {
+    const orig = store[r.method].bind(store);
+    let armed = true;
+    store[r.method] = async (...a) => { if (armed && r.when(...a)) { armed = false; fired.push(r.label); throw new Error('injected write failure: ' + r.label); } return orig(...a); };
+  }
+  await host.start();
+  const t1 = plan([D('shell', 'black', 'none', 'recycled')], { berlin: line('D1', { mode: 'partner', bid: 1.6 }), tokyo: line('D1') });
+  const carry = { type: 'carry', market: 'berlin', design: { id: 'D1', cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' } };
+  let failures = 0, steps = 0;
+  while (host.game.phase !== 'final') {
+    const g = host.game, s = g.round;
+    if (g.phase === 'decide') {
+      await store.patchDecision(host.gid, 'T1', s, { plan: t1, locked: true });
+      if (s % 2) await store.patchDecision(host.gid, 'T2', s, { plan: ok([D('denim', 'earth', 'small', 'light')]) });
     }
-    const run = host.exportRun();
-    delete run.taste_code;
-    return JSON.stringify(run);
-  };
-  const a = await play(true), b = await play(false);
-  assert.equal(a, b);
+    if (g.phase === 'reveal' && g.reveal.idx === 4 && s < 4) await store.patchDecision(host.gid, 'T2', s, { notes: [carry] });
+    try { if (useClock) assert.equal(await runOut(host, clock), true); else assert.equal(await host.advance(stepKey(host.game)), true); }
+    catch (e) { assert.match(e.message, /injected write failure/); failures++; }
+    assert.ok(++steps < 60, 'no runaway');
+  }
+  const run = host.exportRun();
+  delete run.taste_code;
+  return { run: JSON.stringify(run), failures, fired, host };
+}
+
+test('the clock changes when things happen, never what happens: a game run on the clock equals the same game run with Skip', async () => {
+  const a = await playGame({ useClock: true }), b = await playGame({ useClock: false });
+  assert.equal(a.run, b.run);
+  assert.ok(a.host.state.offers.length >= 1, 'the script made at least one carry offer, so offers are inside the comparison');
+});
+
+test('a failed write never wedges the game: each step retries only its writes, and the finished game equals one with no failures', async () => {
+  let n3 = 0;
+  const inject = [
+    { label: 'reveal snapshot, season 1 resolve', method: 'putSnapshot', when: (gid, r, kind) => kind === 'reveal' && r === 1 },
+    { label: 'game row, season 2 resolve', method: 'patchGame', when: (gid, p) => p.phase === 'reveal' && p.reveal && p.reveal.season === 2 && p.reveal.idx === 0 },
+    { label: 'result snapshot, season 1 recap', method: 'putSnapshot', when: (gid, r, kind) => kind === 'result' && r === 1 },
+    { label: 'team view, season 2 open (engine already moved on)', method: 'putSnapshot', when: (gid, r, kind) => kind === 'view' && r === 2 },
+    { label: 'game row, season 3 open', method: 'patchGame', when: (gid, p) => p.phase === 'decide' && p.round === 3 },
+    { label: 'decisions read, season 3 recap (carry offers)', method: 'getDecisions', when: (gid, r) => r === 3 && ++n3 === 2 },
+    { label: 'game row, finish', method: 'patchGame', when: (gid, p) => p.phase === 'final' },
+  ];
+  const bad = await playGame({ useClock: true, inject }), good = await playGame({ useClock: true });
+  assert.deepEqual([...bad.fired].sort(), inject.map(r => r.label).sort(), 'every injected failure fired once');
+  assert.equal(bad.failures, inject.length);
+  assert.equal(bad.run, good.run, 'same game: no season resolved twice, no offer made twice, no season opened twice');
+  const st = bad.host.state;
+  for (const s of [1, 2, 3, 4]) assert.equal(st.tables.ww_decisions.filter(d => d.round === s).length, st.order.length, 'one decisions row per team in season ' + s);
+  assert.equal(bad.host.game.phase, 'final');
+});
+
+test('Skip and Back carry their step: a double-click moves one step, not two', async () => {
+  const { host, clock } = await room({ humans: 1, house: 1 });
+  await host.start();
+  const k = stepKey(host.game);
+  assert.equal(await host.advance(k), true);
+  assert.equal(await host.advance(k), false, 'the second click still carries decide:1, so it does nothing');
+  assert.equal(stepKey(host.game), 'reveal:1:0');
+  await host.advance(stepKey(host.game));
+  await host.advance(stepKey(host.game));
+  assert.equal(stepKey(host.game), 'reveal:1:2');
+  const b = stepKey(host.game);
+  const r = await Promise.all([host.back(b), host.back(b)]);
+  assert.equal(r.filter(Boolean).length, 1);
+  assert.equal(stepKey(host.game), 'reveal:1:1', 'one market back');
+  assert.equal(await host.back(b), false, 'a late Back drawn for reveal:1:2 does nothing');
+  assert.equal(await runOut(host, clock), true, 'Back gave the market a fresh clock that still runs out on its own');
+  assert.equal(stepKey(host.game), 'reveal:1:2');
+});
+
+test('+30 s and Pause are honoured during the all-locked seconds, and an unlock while paused gives the full clock back', async () => {
+  // pure functions first
+  const full = newClock(240, 'decide:2', T0), e = earlyClock(full, 5, T0 + 10000);
+  const e30 = addTime(e, 30);
+  assert.equal(e30.endsAt, T0 + 45000); assert.equal(e30.fullEndsAt, T0 + 270000, '+30 s moves the full clock too');
+  assert.equal(restoreClock(e30, T0 + 20000).endsAt, T0 + 270000, 'an unlock after +30 s keeps the added time');
+  const ep = pauseClock(e, T0 + 12000);
+  const fp = pauseClock(full, T0);
+  assert.equal(earlyClock(fp, 5, T0), fp, 'a paused clock is never shortened');
+  const rp = restoreClock(ep, T0 + 99000);
+  assert.equal(rp.paused, true); assert.equal(rp.remaining, 228000, 'unlock while paused: the full time left comes back, still paused'); assert.equal(rp.early, undefined);
+  assert.equal(resumeClock(rp, T0 + 200000).endsAt, T0 + 428000);
+  assert.equal(addTime(ep, 30).fullRemaining, ep.fullRemaining + 30000);
+
+  // through the host
+  const { host, clock, store } = await room({ humans: 2, house: 1 });
+  await host.start();
+  const fullEnds = host.game.clock.endsAt;
+  clock.now = fullEnds - 100000;
+  for (const id of ['T1', 'T2']) await store.patchDecision(host.gid, id, 1, { plan: ok(), locked: true });
+  let ready = await host.readiness();
+  await host.lockState(ready, 1);
+  assert.equal(host.game.clock.endsAt, clock.now + 5000);
+  await host.addTime(30);
+  assert.equal(host.game.clock.endsAt, clock.now + 35000, '+30 s during the all-locked seconds is honoured');
+  assert.equal(host.lockTarget(ready, 1), null, 'and not cut back to 5 s while everyone stays locked');
+  clock.now += 6000;
+  assert.equal(await host.tick(), false, 'still 29 s to go');
+  await host.pause();
+  clock.now += 10 * 60000;
+  assert.equal(await host.tick(), false, 'paused during the all-locked seconds: nothing moves');
+  await store.patchDecision(host.gid, 'T2', 1, { locked: false });
+  ready = await host.readiness();
+  assert.equal(await host.lockState(ready, 1), true, 'an unlock while paused is acted on');
+  assert.equal(host.game.clock.paused, true);
+  assert.equal(host.game.clock.remaining, 100000 + 30000 - 6000, 'the full clock, with the 30 s, is back');
+  await host.resume();
+  assert.equal(host.game.clock.endsAt, clock.now + 124000);
+  await store.patchDecision(host.gid, 'T2', 1, { locked: true });
+  ready = await host.readiness();
+  await host.lockState(ready, 1);
+  clock.now += 5300;
+  assert.equal(await host.tick(), true);
+  assert.equal(stepKey(host.game), 'reveal:1:0');
+});
+
+test('carry offers written during the recap are collected when its clock ends; one written after that is not', async () => {
+  const { host, clock, store } = await room({ humans: 2, house: 0 });
+  await host.start();
+  const t1 = plan([D('shell', 'black', 'none', 'recycled')], { berlin: line('D1', { mode: 'partner', bid: 1.6 }) });
+  const offer = { type: 'carry', market: 'berlin', design: { id: 'D1', cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' } };
+  await store.patchDecision(host.gid, 'T1', 1, { plan: t1, locked: true });
+  await store.patchDecision(host.gid, 'T2', 1, { plan: ok([D('denim', 'earth', 'small', 'light')]), locked: true });
+  for (let i = 0; i < 5; i++) await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'reveal:1:4');
+  assert.equal(host.state.history[1].seats.berlin, 'T1', 'T1 holds the Berlin seat');
+  await store.patchDecision(host.gid, 'T2', 1, { notes: [offer] });           // during the recap
+  await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'decide:2');
+  assert.deepEqual(host.state.offers.map(o => [o.carried, o.holder, o.market, o.applies]), [['T2', 'T1', 'berlin', 2]]);
+  assert.equal(teamView(host.state, 'T1').offersToMe.length, 1, 'T1 sees the offer in its season 2 view');
+  assert.equal((await store.getSnapshots(host.gid, { kind: 'view', round: 2, teamId: 'T1' }))[0].data.view.offersToMe.length, 1, 'and so does its team page');
+  // too late: a second offer on the season 1 row once season 2 is open, then season 2 runs to its recap with no new notes
+  await store.patchDecision(host.gid, 'T2', 1, { notes: [offer, { ...offer, design: { ...offer.design, id: 'D2', cut: 'shell' } }] });
+  await store.patchDecision(host.gid, 'T1', 2, { plan: t1, locked: true });
+  for (let i = 0; i < 5; i++) await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'reveal:2:4');
+  assert.equal(host.state.history[2].seats.berlin, 'T1');
+  await store.patchDecision(host.gid, 'T2', 2, { notes: [{ ...offer, design: { ...offer.design, id: 'D3', palette: 'black' } }] });   // on time, season 2 recap
+  await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'decide:3');
+  const next = host.state.offers.filter(o => o.applies === 3);
+  assert.deepEqual(next.map(o => o.design.id), ['D3'], 'the on-time season 2 offer counts; the late note on the season 1 row (D2) was never read');
+  assert.equal(new Set(host.state.tables.ww_deals.map(d => d.deal_id)).size, 2, 'two offers in all, none from the late note');
+});
+
+test('the admin tick falls back to setInterval when the worker fails after starting, fails to start, or never ticks', async () => {
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const until = async (cond, ms = 2000) => { const end = Date.now() + ms; while (!cond() && Date.now() < end) await wait(5); return cond(); };   // Windows timers are coarse
+  class FakeWorker { constructor() { FakeWorker.last = this; this.terminated = false; } terminate() { this.terminated = true; } }
+  const savedWorker = globalThis.Worker;
+  try {
+    // 1. starts, ticks twice, then throws: the tick carries on from setInterval and the worker is dropped
+    globalThis.Worker = FakeWorker;
+    let n = 0;
+    let stop = every(10, () => n++, { watchdogMs: 5000 });
+    const w = FakeWorker.last;
+    w.onmessage(); w.onmessage();
+    assert.equal(n, 2);
+    w.onerror(new Error('worker died'));
+    assert.equal(w.terminated, true);
+    assert.ok(await until(() => n >= 5), 'setInterval took over (' + n + ' ticks)');
+    const before = n; w.onmessage();
+    assert.equal(n, before, 'a stray message from the dead worker does not add a tick');
+    stop();
+    const after = n; await wait(40); assert.equal(n, after, 'stop() stops the fallback too');
+    // 2. the constructor throws (worker blocked): straight to setInterval
+    globalThis.Worker = class { constructor() { throw new Error('blocked'); } };
+    n = 0; stop = every(10, () => n++);
+    assert.ok(await until(() => n >= 3), 'fallback when the worker cannot start (' + n + ')'); stop();
+    // 3. starts but never sends a tick: the watchdog falls back
+    globalThis.Worker = FakeWorker;
+    n = 0; stop = every(10, () => n++, { watchdogMs: 30 });
+    assert.ok(await until(() => n >= 3), 'watchdog fallback (' + n + ')'); stop();
+    assert.equal(FakeWorker.last.terminated, true);
+    // 4. a healthy worker: no fallback, ticks come only from the worker
+    n = 0; stop = every(10, () => n++, { watchdogMs: 30 });
+    FakeWorker.last.onmessage();
+    await wait(80);
+    assert.equal(n, 1, 'no setInterval ticks while the worker is healthy');
+    assert.equal(FakeWorker.last.terminated, false);
+    stop();
+  } finally { if (savedWorker === undefined) delete globalThis.Worker; else globalThis.Worker = savedWorker; }
 });

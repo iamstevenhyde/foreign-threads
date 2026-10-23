@@ -80,7 +80,7 @@ export const LATE_PAYMENT_FINAL_HAIRCUT = 0.2;
 export const CLOCK = {
   decideSeconds: { 1: 300, 2: 240, 3: 240, 4: 240 },
   revealSecondsPerMarket: 60,   // one market on the projector; inside the 90 s cap in GAME_SPEC.md
-  recapSeconds: 90,             // recap: own results on the team page and carry offers for next season
+  recapSeconds: 120,            // recap: own results on the team page and carry offers for next season (90 s was judged too short, audit 10/23)
   finalRecapSeconds: 45,        // recap after the last season (no offers), then the final ranking
   allLockedSeconds: 5,          // once every human team has locked, the decision clock drops to this
   savedPlanRunsAtZero: true,    // a team that has not locked when its clock runs out plays the plan saved on its page if it passes the checks (Parent Trap does

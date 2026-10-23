@@ -5,7 +5,7 @@ import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss 
 import { Host } from './host.js';
 import { BRAND_BY_ID, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js';
 import { HOUSE, CLOCK, SEASONS } from '../config/rules.js';
-import { clockLeft, gamePlan } from './clock.js';
+import { clockLeft, gamePlan, stepKey } from './clock.js';
 import { every } from './ticker.js';
 
 const app = $('#app');
@@ -48,6 +48,16 @@ function tick() {
   if (host.due()) step(() => host.tick());
 }
 const clockText = g => !g.clock ? '' : (g.clock.paused ? 'PAUSED ' : '') + mmss(clockLeft(g.clock, Date.now())) + (g.clock.early && !g.clock.paused ? ' (all locked)' : '');
+
+// Skip and Back carry the step they were drawn for, and ignore a click in the first second of a step, so a double-click, or a click that lands just
+// after the clock moved on, never skips (or backs up) two steps.
+const shownAt = {};
+function stepBtn(label, key, fn, title) {
+  return h('button', { disabled: busy, title, onclick: () => {
+    if (Date.now() - (shownAt[key] || 0) < 1000) return toast('That step has just started. Click again to skip it too.');
+    guard(() => fn(key));
+  } }, label);
+}
 
 function landing() {
   const f = { teams: 6, house: 2, seed: '', bot: pageMode() === 'local' };
@@ -120,12 +130,14 @@ function clockCard(g) {
       h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: set.savedPlanRuns !== false, onchange: ev => setSetting({ savedPlanRuns: ev.target.checked }) }), 'At zero, a team that has not locked plays its saved plan')),
     h('p', 'Each season: decide ' + mmss(secsOf(s1, 'decide') * 1000) + ' in season 1 and ' + mmss(secsOf(s2, 'decide') * 1000) + ' after, then ' + mmss(secsOf(s1, 'market 1') * 1000) + ' per market on the projector, then a ' + mmss(secsOf(s1, 'recap') * 1000) +
       ' recap for results and carry offers (' + mmss(plan.steps[plan.steps.length - 1].seconds * 1000) + ' after the last season). Whole game: ', h('b', mmss(plan.total * 1000)), ' if nobody locks early.'),
+    h('p', h('b', 'Run exactly one admin window for this game.'), ' A second admin tab or laptop would also run the clock; close it before Start.'),
     h('p.small.muted', 'After Start nothing needs a click. A decision window closes ' + CLOCK.allLockedSeconds + ' seconds after every human team has locked. Pause, +30 s and Skip stay available as overrides. Keep this page open (its own window is best) on the laptop that started the game: this page runs the clock and the engine.'));
 }
 
 function render() {
   if (!host) return landing();
-  const g = host.game, st = host.state, phase = g.phase;
+  const g = host.game, st = host.state, phase = g.phase, key = stepKey(g);
+  if (!shownAt[key]) shownAt[key] = Date.now();
   const ctrl = [];
   const clockBtns = () => g.clock ? [
     g.clock.paused ? h('button', { disabled: busy, onclick: () => guard(() => host.resume()) }, 'Resume clock') : h('button', { disabled: busy, onclick: () => guard(() => host.pause()) }, 'Pause clock'),
@@ -139,16 +151,16 @@ function render() {
   } else if (phase === 'decide') {
     ctrl.push(h('b', { style: 'font:700 28px monospace' }, h('span#clock', clockText(g))));
     ctrl.push(...clockBtns());
-    ctrl.push(h('button', { disabled: busy, title: 'Optional. The season resolves by itself when the clock runs out.', onclick: () => guard(() => host.advance()) }, 'Skip: resolve now'));
+    ctrl.push(stepBtn('Skip: resolve now', key, k => host.advance(k), 'Optional. The season resolves by itself when the clock runs out.'));
     ctrl.push(h('span.muted', host.autoAdvance ? 'Resolves by itself at zero, or ' + CLOCK.allLockedSeconds + ' s after every human team has locked. ' + (g.settings.savedPlanRuns !== false ? 'A team that has not locked plays its saved plan; with nothing saved, its last plan stands.' : 'A team that never locks keeps its last plan.') : 'Advance on the clock is off: press Skip.'));
   } else if (phase === 'reveal') {
     const idx = g.reveal ? g.reveal.idx : 0;
     ctrl.push(h('span', 'Reveal step ' + (idx + 1) + ' of 5 (' + (idx < 4 ? MARKETS[MARKET_IDS[idx]].name : 'recap: results and carry offers') + ')'));
     ctrl.push(h('b', { style: 'font:700 28px monospace' }, h('span#clock', clockText(g))));
     ctrl.push(...clockBtns());
-    ctrl.push(h('button', { disabled: busy || idx <= 0, onclick: () => guard(() => host.setReveal(idx - 1)) }, 'Back'));
-    ctrl.push(h('button', { disabled: busy, title: 'Optional. Each step moves on by itself when its clock runs out.' + (idx >= 4 ? ' Collects carry offers teams wrote.' : ''), onclick: () => guard(() => host.advance()) },
-      idx < 4 ? 'Skip: next ' + (idx < 3 ? 'market' : 'step (recap)') : st.season >= st.seasons ? 'Skip: finish game' : 'Skip: next season'));
+    if (idx > 0) ctrl.push(stepBtn('Back', key, k => host.back(k)));
+    ctrl.push(stepBtn(idx < 4 ? 'Skip: next ' + (idx < 3 ? 'market' : 'step (recap)') : st.season >= st.seasons ? 'Skip: finish game' : 'Skip: next season', key, k => host.advance(k),
+      'Optional. Each step moves on by itself when its clock runs out.' + (idx >= 4 ? ' Collects carry offers teams wrote.' : '')));
   } else if (phase === 'final') {
     ctrl.push(h('span.ok', 'Game over. Download the log for the debrief.'));
   }
