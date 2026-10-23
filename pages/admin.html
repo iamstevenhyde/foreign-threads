@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="icon" href="data:,">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foreign Threads: Host</title>
+<link rel="stylesheet" href="ft.css">
+</head>
+<body class="page-admin">
+<div id="app"><p style="padding:24px;font-family:sans-serif">Loading...</p></div>
+<noscript>This page needs JavaScript.</noscript>
+<script>
+function wwModuleFail() {
+  document.getElementById('app').innerHTML = '<div style="padding:32px;font:20px/1.5 sans-serif;max-width:760px"><h1>This browser blocked the page scripts.</h1><p>Chrome and Edge do not load ES modules straight from a file. Do one of these:</p><ol><li>In the pages folder run <b>node serve.mjs</b> (or double-click <b>serve.bat</b>), then open the address it prints.</li><li>Or start Chrome with <b>--allow-file-access-from-files</b>.</li></ol></div>';
+}
+</script>
+<script type="module" src="admin.js" onerror="wwModuleFail()"></script>
+</body>
+</html>

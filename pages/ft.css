@@ -1,0 +1,74 @@
+/* Foreign Threads: one stylesheet for the team, admin and projector pages. No gradients. */
+:root {
+  --paper: #f6f1e7; --card: #fffdf8; --ink: #1d1b16; --muted: #6b665a; --line: #d8d0bd;
+  --olive: #55612b; --olive-d: #3f4920; --rust: #b4532a; --red: #b3261e; --cobalt: #1f3fbf; --acid: #e4ff3a; --good: #2d6a3e;
+  --head: 'Bodoni Moda', Georgia, 'Times New Roman', serif; --body: 'IBM Plex Sans', system-ui, 'Segoe UI', Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.4; }
+h1, h2, h3 { font-family: var(--head); font-weight: 700; margin: 0 0 .4em; line-height: 1.1; }
+h1 { font-size: 30px; } h2 { font-size: 22px; } h3 { font-size: 17px; }
+button { font: inherit; cursor: pointer; border: 1px solid var(--ink); background: var(--card); color: var(--ink); padding: 8px 14px; border-radius: 4px; }
+button.primary { background: var(--olive); color: #fff; border-color: var(--olive-d); }
+button.warn { background: var(--rust); color: #fff; border-color: var(--rust); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.small { padding: 3px 9px; font-size: 14px; }
+input, select, textarea { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); max-width: 100%; }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--ink); color: #fff; }
+.bar b { font-family: var(--head); font-size: 20px; }
+.bar .num { font-variant-numeric: tabular-nums; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin: 0 0 14px; }
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.chip { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--line); background: #fff; margin: 0 4px 3px 0; }
+.chip.free { border-color: var(--good); color: var(--good); } .chip.costly { border-color: var(--red); color: var(--red); }
+.chip.house { background: #ddd; color: #444; border-color: #aaa; font-weight: 700; } .chip.bot { background: #e9e0ff; border-color: #a99ae0; }
+.chip.hot { background: var(--acid); border-color: var(--ink); font-weight: 700; }
+.err { color: var(--red); } .ok { color: var(--good); } .warnt { color: var(--rust); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.garment { width: 120px; height: 150px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 4px; }
+.design { display: flex; gap: 12px; }
+.design .sel { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1; }
+.mk h3 { display: flex; justify-content: space-between; }
+.lock { position: sticky; bottom: 0; background: var(--card); border-top: 2px solid var(--ink); padding: 10px 16px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; z-index: 5; }
+.toast { position: fixed; right: 14px; bottom: 70px; background: var(--ink); color: #fff; padding: 8px 14px; border-radius: 4px; margin-top: 6px; }
+#toasts { position: fixed; right: 0; bottom: 0; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 14px; }
+.kv span:nth-child(odd) { color: var(--muted); }
+.news { border-left: 4px solid var(--cobalt); padding-left: 10px; margin-bottom: 10px; }
+.news b { font-family: var(--head); }
+pre.log { max-height: 220px; overflow: auto; background: #fff; border: 1px solid var(--line); padding: 8px; font-size: 12px; }
+
+/* projector: 1920x1080 stage scaled by the page, nothing under 24px */
+body.page-projector { background: #f4f1ea; font-size: 28px; overflow: hidden; }
+.stage { width: 1920px; height: 1080px; transform-origin: top left; position: absolute; left: 0; top: 0; padding: 48px 72px; }
+.stage h1 { font-size: 84px; } .stage h2 { font-size: 52px; } .stage h3 { font-size: 36px; }
+.stage .masthead { display: flex; justify-content: space-between; border-bottom: 4px solid var(--ink); padding-bottom: 10px; margin-bottom: 26px; font-family: var(--head); font-size: 34px; }
+.stage .clock { font-size: 64px; font-variant-numeric: tabular-nums; font-family: var(--body); font-weight: 700; }
+.stage .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.stage .tile { background: #fff; border: 2px solid var(--ink); padding: 12px 16px; font-size: 28px; }
+.stage .tile.done { background: var(--acid); }
+.stage .tile.house { background: #e4e4e4; color: #555; border-style: dashed; }
+.stage .chip { font-size: 22px; padding: 2px 12px; }
+.stage table { font-size: 30px; } .stage th { font-size: 22px; } .stage td, .stage th { padding: 8px 12px; }
+.stage .lead { font-family: var(--head); font-size: 56px; font-weight: 700; line-height: 1.05; }
+.stage .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.stage .garment { width: 150px; height: 190px; }
+.stage .big { font-size: 40px; }
+.stage.dark { background: #15130f; color: #f2ecdf; }
+.stage.dark .chip { background: #2a2620; color: #f2ecdf; border-color: #6b665a; }
+.stage.dark .masthead { border-color: #f2ecdf; }
+.stage .rowline { display: flex; gap: 24px; align-items: center; padding: 8px 0; border-bottom: 1px solid #8884; }
+
+@media (max-width: 640px) {
+  .wrap { padding: 10px; } h1 { font-size: 24px; } .design { flex-direction: column; } .garment { width: 100px; height: 125px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
