@@ -2,6 +2,7 @@
 // Reads only 'view' and 'result' snapshots the host published (fog already applied). Writes only this team's ww_decisions row.
 import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat, forgetSeat } from './supa.js';
 import { h, $, params, setParam, toast, debounce, mmss, friendlyError } from './util.js';
+import { clockLeft } from './clock.js';
 import { validateWith } from '../engine/core.mjs';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, dnaChips, tag, garmentImg, tilesText, money, money1, pctf,
   MODE_LABEL, PRICE_LABEL, streetSrc, art, GAME_TITLE } from './ui.js';
@@ -51,7 +52,7 @@ async function load() {
     if (planSeason !== r && view) { if (!planP || planP.r !== r) { planP = initPlan(r); planP.r = r; } await planP; }
   }
   finalSnap = game.phase === 'final' ? ((await store.getSnapshots(game.id, { kind: 'final' }))[0] || {}).data || null : null;
-  const s = [game.phase, game.round, !!view, !!result, !!finalSnap, game.reveal && game.reveal.idx].join('|');
+  const s = [game.phase, game.round, !!view, !!result, !!finalSnap, game.reveal && game.reveal.idx, game.clock && [game.clock.step, game.clock.paused, game.clock.early].join(',')].join('|');
   const changed = s !== sig; sig = s;
   return changed;
 }
@@ -187,7 +188,7 @@ function decideScreen() {
   const lockBar = h('div.lock',
     h('span', 'Plan needs ', h('b', money(c.total)), ' of your ', h('b', money(view.cash)), ' ', v.ok ? h('span.ok', 'OK') : h('span.err', 'too many problems to lock')),
     h('span.muted.small', 'fees ' + money(c.fees) + ', brand surcharge ' + money(c.dna) + ', lines ' + money(c.lines) + ', seat bids ' + money(c.escrow) + ', research ' + money(c.research)),
-    locked ? h('b.ok', 'LOCKED') : null,
+    locked ? h('b.ok', 'LOCKED') : h('span#tclock-note.err.small'),
     locked ? h('button', { onclick: async () => { locked = false; await store.patchDecision(game.id, seat.team_id, planSeason, { locked: false }); render(); } }, 'Unlock to edit')
       : h('button.primary', { disabled: !v.ok || !plan.designs.length && !plan.copy.length, onclick: async () => {
         locked = true; await store.patchDecision(game.id, seat.team_id, planSeason, { plan, why, locked: true, locked_by: seat.name, locked_at: new Date().toISOString(), lock_left: Math.round(left / 1000) });
@@ -206,6 +207,10 @@ function decideScreen() {
     rulesPanel()), lockBar);
 }
 
+const savedRuns = () => !game.settings || game.settings.savedPlanRuns !== false;
+const zeroRule = () => savedRuns() ? 'Every step runs on the clock. If time runs out before you lock, the plan saved on this page runs if it passes the checks; with nothing saved, your last plan stands.'
+  : 'Every step runs on the clock. If you do not lock, your last plan stands.';
+
 function rulesPanel() {
   return h('details.card', h('summary', 'How a season works'), h('ul.small',
     h('li', 'Each design is four tiles: cut, colour, logo, fabric. Each market has a hidden taste. The more tile rows you match, weighted by how much that row matters, the higher your fit.'),
@@ -213,13 +218,14 @@ function rulesPanel() {
     h('li', 'Pressure to localize is how much a market punishes a product that does not match its taste. Dearer price tiers cost more to make.'),
     h('li', 'Ship is cheap but reaches fewer buyers. Partner needs a sealed bid; the highest bid wins the one seat and learns one more row. Own costs a set-up fee.'),
     h('li', 'Foreignness tax falls each season you sell in a market. Rows of the taste are revealed as you sell there.'),
-    h('li', 'If you do not lock, your last plan stands. Most profit after season ' + view.seasons + ' wins.')));
+    h('li', zeroRule() + ' Most profit after season ' + view.seasons + ' wins.')));
 }
 
 // ---------- results ----------
 function resultScreen() {
   const r = result, m = r.mine;
-  const banner = r.stood ? h('div.card', h('b', 'Your last plan stood.'), ' You did not lock a plan this season' + (r.engineError ? ' (' + r.engineError + ')' : '') + ', so last season\'s plan ran again.')
+  const banner = r.savedRan ? h('div.card', h('b', 'Time ran out before you locked, so the plan saved on your page ran.'))
+    : r.stood ? h('div.card', h('b', 'Your last plan stood.'), ' You did not lock a plan this season' + (r.engineError ? ' (' + r.engineError + ')' : '') + ', so last season\'s plan ran again.')
     : r.locked && (r.plan && (r.plan.designs.length || r.plan.copy.length)) ? h('div.card', 'Your locked plan ran.')
     : h('div.card', h('b', 'You sat this season out.'), r.engineError ? ' ' + r.engineError : ' No plan was locked and there was no earlier plan to repeat.');
   const rows = MARKET_IDS.filter(x => r.lines[x]).map(x => { const l = r.lines[x];
@@ -243,7 +249,7 @@ function carryPanel() {
   const mine = (r.plan && r.plan.designs) || [];
   if (!opts.length || !mine.length) return h('div.card', h('h3', 'Carry offers'), h('p.small.muted', 'No partner seat is held by another human team this season, so there is nothing to offer a carry to.'));
   const f = { m: opts[0], d: mine[0].id };
-  return h('div.card', h('h3', 'Offer a carry for next season'), h('p.small.muted', 'The holder of a partner seat can carry your line next season for $' + view.pub.CARRY.fee + 'M, but they see your design and may copy it. They must accept in their plan and win the seat again.'),
+  return h('div.card', h('h3', 'Offer a carry for next season'), h('p.small.muted', 'The holder of a partner seat can carry your line next season for $' + view.pub.CARRY.fee + 'M, but they see your design and may copy it. They must accept in their plan and win the seat again. Offers close when the clock at the top runs out.'),
     notes.filter(n => n.type === 'carry').map((n, i) => h('p.small', 'Offered in ' + MARKETS[n.market].name + ' with design ' + n.design.id + ' ', h('button.small', { onclick: async () => { notes.splice(notes.indexOf(n), 1); await store.patchDecision(game.id, seat.team_id, result.season, { notes }); render(); } }, 'Withdraw'))),
     h('div.row', h('div', h('label', 'Market'), h('select', { onchange: ev => { f.m = ev.target.value; } }, opts.map(m => h('option', { value: m }, MARKETS[m].name + ' (held by ' + brandName(r.seats[m]) + ')')))),
       h('div', h('label', 'Your design'), h('select', { onchange: ev => { f.d = ev.target.value; } }, mine.map(d => h('option', { value: d.id }, d.id + ': ' + tilesText(d))))),
@@ -271,12 +277,27 @@ function finalScreen() {
     result ? resultScreen() : null);
 }
 
+function clockLabel() {
+  const c = game.clock;
+  if (!c) return '';
+  if (c.paused) return 'Paused';
+  if (game.phase === 'decide') return c.early ? 'All locked, closing in' : 'Lock in';
+  const idx = (game.reveal && game.reveal.idx) || 0;
+  return idx < 3 ? 'Next market in' : idx === 3 ? 'Your results in' : game.round >= ((game.settings && game.settings.seasons) || 4) ? 'Final ranking in' : 'Next season in';
+}
 function header() {
-  const left = game.clock && game.phase === 'decide' ? Math.max(0, game.clock.endsAt - Date.now()) : null;
   const b = BRAND_BY_ID[team.brand_id];
   return h('div.bar', h('b', b.name), h('span', GAME_TITLE + (game.round ? ', season ' + game.round + (view ? ' of ' + view.seasons : '') : '')),
     view ? h('span.num', 'Cash ' + money1(result && game.phase !== 'decide' ? result.mine.cashEnd : view.cash)) : null,
-    left !== null ? h('span.num', mmss(left)) : null);
+    game.clock && (game.phase === 'decide' || game.phase === 'reveal') ? h('span.num', clockLabel() + ' ', h('b#tclock', mmss(clockLeft(game.clock, Date.now())))) : null);
+}
+// Four times a second: the countdown in the header, red in the last 30 seconds of a decision, and the lock-bar warning. No redraw, so typing is safe.
+function paintClock() {
+  if (!game || !game.clock) return;
+  const left = clockLeft(game.clock, Date.now()), el = $('#tclock');
+  if (el) { el.textContent = mmss(left); el.style.color = game.phase === 'decide' && !game.clock.paused && left <= 30000 ? '#ff6b5b' : ''; }
+  const note = $('#tclock-note');
+  if (note) note.textContent = game.phase !== 'decide' || game.clock.paused || left > 30000 ? '' : left > 0 ? 'Under 30 seconds. ' + (savedRuns() ? 'At zero the plan saved on this page runs.' : 'Lock now or your last plan stands.') : 'Time is up. The season is closing.';
 }
 
 function render() {
@@ -292,13 +313,14 @@ function render() {
   const y = window.scrollY;
   app.replaceChildren(header(), body);
   window.scrollTo(0, y);
+  paintClock();
 }
 
 async function start() {
   clearInterval(tick);
   await load(); render();
   store.subscribe(seat.game_id, async () => { if (await load()) render(); });
-  tick = setInterval(() => { if (game && game.phase === 'decide') { const b = $('.bar .num:last-child'); if (b && game.clock) b.textContent = mmss(Math.max(0, game.clock.endsAt - Date.now())); } }, 1000);
+  tick = setInterval(paintClock, 250);
   setInterval(() => heartbeat(store, seat).catch(() => {}), 30000);
 }
 

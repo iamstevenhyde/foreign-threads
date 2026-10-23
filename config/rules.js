@@ -75,10 +75,17 @@ export const COPY = {
 // Duty and payment lag live on the market rule strip (markets.js). Receivable written off at the end of season 4:
 export const LATE_PAYMENT_FINAL_HAIRCUT = 0.2;
 
-// Time. Minutes. 75-minute class (GAME_SPEC.md section 6).
+// Time. Seconds. 75-minute class (GAME_SPEC.md section 4). After the host presses Start every step runs on this clock and the admin page moves the
+// game on by itself (pages/clock.js); Pause, +30 s and Skip on the admin page are optional. The host can scale every number below in the lobby.
 export const CLOCK = {
   decideSeconds: { 1: 300, 2: 240, 3: 240, 4: 240 },
-  revealSecondsPerMarket: 90,
+  revealSecondsPerMarket: 60,   // one market on the projector; inside the 90 s cap in GAME_SPEC.md
+  recapSeconds: 90,             // recap: own results on the team page and carry offers for next season
+  finalRecapSeconds: 45,        // recap after the last season (no offers), then the final ranking
+  allLockedSeconds: 5,          // once every human team has locked, the decision clock drops to this
+  savedPlanRunsAtZero: true,    // a team that has not locked when its clock runs out plays the plan saved on its page if it passes the checks (Parent Trap does
+                                // the same); otherwise its last plan stands. false = strict GAME_SPEC rule 1.7: only a locked plan counts.
+  speeds: [0.5, 0.75, 1, 1.25, 1.5],
   rulesSeconds: 180,
 };
 

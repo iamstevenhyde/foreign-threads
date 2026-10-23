@@ -1,12 +1,15 @@
 // Admin / host page. Creates a game, shows join codes, runs the clock and the reveal, and runs the engine (host.js).
+// After Start the game runs itself on the clock (host.tick, driven by a worker tick in ticker.js); every button below Start is an optional override.
 import { openStore } from './supa.js';
 import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss } from './util.js';
 import { Host } from './host.js';
 import { BRAND_BY_ID, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js';
-import { HOUSE } from '../config/rules.js';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js';
+import { clockLeft, gamePlan } from './clock.js';
+import { every } from './ticker.js';
 
 const app = $('#app');
-let store, host = null, ready = {}, claimed = {}, busy = false, timer = null, unsub = null;
+let store, host = null, ready = {}, readyRound = 0, claimed = {}, busy = false, timer = null, unsub = null;
 function attach() {
   if (unsub) unsub();
   unsub = store.subscribe(host.gid, () => { clearTimeout(attach.t); attach.t = setTimeout(() => { if (!busy) refresh(); }, 400); });
@@ -28,12 +31,23 @@ async function refresh() {
   await host.refreshGame();
   if (host.game.phase !== 'lobby' && !host.state) await host.load(host.gid);
   claimed = await host.claimedTeams();
-  if (host.state && host.game.phase === 'decide') ready = await host.readiness(); else ready = {};
+  if (host.state && host.game.phase === 'decide') { ready = await host.readiness(); readyRound = host.game.round; } else { ready = {}; readyRound = 0; }
   render();
-  if (host.game.phase === 'decide' && host.meta.humans.length && Object.values(ready).every(r => r.locked) && !busy && host.game.settings.autoResolve !== false) {
-    guard(() => host.resolve());
-  }
+  tick();
 }
+
+// Twice a second: count down on screen, shorten the decision clock once every human team has locked (or give it back if one unlocks), and move the
+// game on when the clock runs out. Nothing here waits for a click.
+let tickRest = 0;   // after a failed step (say the network dropped) wait a few seconds before trying again, instead of a toast every half second
+function tick() {
+  if (!host || !host.game) return;
+  const c = $('#clock'); if (c) c.textContent = clockText(host.game);
+  if (busy || Date.now() < tickRest) return;
+  const step = fn => guard(async () => { try { await fn(); } catch (e) { tickRest = Date.now() + 5000; throw e; } });
+  if (host.lockTarget(ready, readyRound)) { step(() => host.lockState(ready, readyRound)); return; }
+  if (host.due()) step(() => host.tick());
+}
+const clockText = g => !g.clock ? '' : (g.clock.paused ? 'PAUSED ' : '') + mmss(clockLeft(g.clock, Date.now())) + (g.clock.early && !g.clock.paused ? ' (all locked)' : '');
 
 function landing() {
   const f = { teams: 6, house: 2, seed: '', bot: pageMode() === 'local' };
@@ -92,11 +106,30 @@ function teamTable() {
     })));
 }
 
+// Lobby only: the clock speed and the whole-game arithmetic at that speed, so the host can fit the class slot before pressing Start.
+function clockCard(g) {
+  const set = g.settings || {}, scale = set.clockScale || 1, seasons = set.seasons || SEASONS, plan = gamePlan(CLOCK, seasons, scale);
+  const s1 = plan.steps.filter(x => x.season === 1), s2 = plan.steps.filter(x => x.season === 2);
+  const secsOf = (steps, k) => (steps.find(x => x.step === k) || { seconds: 0 }).seconds;
+  const setSetting = patch => guard(async () => { await store.patchGame(g.id, { settings: { ...g.settings, ...patch } }); });
+  return h('div.card', h('h2', 'Clock'),
+    h('div.row',
+      h('div', h('label', 'Clock speed'), h('select', { disabled: busy, onchange: ev => setSetting({ clockScale: Number(ev.target.value) }) },
+        CLOCK.speeds.map(x => h('option', { value: x, selected: Math.abs(x - scale) < 1e-9 }, x === 1 ? '1x (class)' : x + 'x' + (x < 1 ? ' (faster)' : ' (slower)'))))),
+      h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: set.autoAdvance !== false, onchange: ev => setSetting({ autoAdvance: ev.target.checked }) }), 'Advance on the clock (off = press Skip for every step)'),
+      h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: set.savedPlanRuns !== false, onchange: ev => setSetting({ savedPlanRuns: ev.target.checked }) }), 'At zero, a team that has not locked plays its saved plan')),
+    h('p', 'Each season: decide ' + mmss(secsOf(s1, 'decide') * 1000) + ' in season 1 and ' + mmss(secsOf(s2, 'decide') * 1000) + ' after, then ' + mmss(secsOf(s1, 'market 1') * 1000) + ' per market on the projector, then a ' + mmss(secsOf(s1, 'recap') * 1000) +
+      ' recap for results and carry offers (' + mmss(plan.steps[plan.steps.length - 1].seconds * 1000) + ' after the last season). Whole game: ', h('b', mmss(plan.total * 1000)), ' if nobody locks early.'),
+    h('p.small.muted', 'After Start nothing needs a click. A decision window closes ' + CLOCK.allLockedSeconds + ' seconds after every human team has locked. Pause, +30 s and Skip stay available as overrides. Keep this page open (its own window is best) on the laptop that started the game: this page runs the clock and the engine.'));
+}
+
 function render() {
   if (!host) return landing();
   const g = host.game, st = host.state, phase = g.phase;
-  const secs = g.clock ? Math.max(0, g.clock.endsAt - Date.now()) : 0;
   const ctrl = [];
+  const clockBtns = () => g.clock ? [
+    g.clock.paused ? h('button', { disabled: busy, onclick: () => guard(() => host.resume()) }, 'Resume clock') : h('button', { disabled: busy, onclick: () => guard(() => host.pause()) }, 'Pause clock'),
+    h('button', { disabled: busy, onclick: () => guard(() => host.addTime(30)) }, '+30 s')] : [];
   if (phase === 'lobby') {
     ctrl.push(h('button.primary', { disabled: busy || host.needsCode, onclick: () => guard(() => host.start()) }, 'Start game (season 1)'));
     ctrl.push(h('button', { disabled: busy || host.teams.filter(t => t.house).length >= HOUSE.maxCount, onclick: () => guard(() => host.addHouse()) }, 'Add a house (AI) team'));
@@ -104,28 +137,32 @@ function render() {
       onchange: ev => guard(async () => { await store.patchGame(g.id, { settings: { ...g.settings, botFill: ev.target.checked } }); }) }), 'Bot-fill teams nobody joined'));
     ctrl.push(h('button', { disabled: busy, onclick: () => guard(() => host.autoPlay(m => console.log(m))) }, 'Test: play all four seasons with bots'));
   } else if (phase === 'decide') {
-    ctrl.push(h('button.primary', { disabled: busy, onclick: () => guard(() => host.resolve()) }, 'Resolve season now'));
-    ctrl.push(h('span.muted', 'Resolves by itself when every human team has locked. A team that never locks keeps its last plan.'));
+    ctrl.push(h('b', { style: 'font:700 28px monospace' }, h('span#clock', clockText(g))));
+    ctrl.push(...clockBtns());
+    ctrl.push(h('button', { disabled: busy, title: 'Optional. The season resolves by itself when the clock runs out.', onclick: () => guard(() => host.advance()) }, 'Skip: resolve now'));
+    ctrl.push(h('span.muted', host.autoAdvance ? 'Resolves by itself at zero, or ' + CLOCK.allLockedSeconds + ' s after every human team has locked. ' + (g.settings.savedPlanRuns !== false ? 'A team that has not locked plays its saved plan; with nothing saved, its last plan stands.' : 'A team that never locks keeps its last plan.') : 'Advance on the clock is off: press Skip.'));
   } else if (phase === 'reveal') {
     const idx = g.reveal ? g.reveal.idx : 0;
-    ctrl.push(h('span', 'Reveal step ' + (idx + 1) + ' of 5 (' + (idx < 4 ? MARKETS[MARKET_IDS[idx]].name : 'recap') + ')'));
+    ctrl.push(h('span', 'Reveal step ' + (idx + 1) + ' of 5 (' + (idx < 4 ? MARKETS[MARKET_IDS[idx]].name : 'recap: results and carry offers') + ')'));
+    ctrl.push(h('b', { style: 'font:700 28px monospace' }, h('span#clock', clockText(g))));
+    ctrl.push(...clockBtns());
     ctrl.push(h('button', { disabled: busy || idx <= 0, onclick: () => guard(() => host.setReveal(idx - 1)) }, 'Back'));
-    ctrl.push(h('button.primary', { disabled: busy || idx >= 4, onclick: () => guard(() => host.setReveal(idx + 1)) }, 'Next market'));
-    ctrl.push(h('button.warn', { disabled: busy || idx < 4, title: 'Reaches the recap first. Collects carry offers teams wrote.', onclick: () => guard(() => host.nextSeason()) },
-      st.season >= st.seasons ? 'Finish game' : 'Next season'));
+    ctrl.push(h('button', { disabled: busy, title: 'Optional. Each step moves on by itself when its clock runs out.' + (idx >= 4 ? ' Collects carry offers teams wrote.' : ''), onclick: () => guard(() => host.advance()) },
+      idx < 4 ? 'Skip: next ' + (idx < 3 ? 'market' : 'step (recap)') : st.season >= st.seasons ? 'Skip: finish game' : 'Skip: next season'));
   } else if (phase === 'final') {
     ctrl.push(h('span.ok', 'Game over. Download the log for the debrief.'));
   }
   if (st && st.history && Object.keys(st.history).length) ctrl.push(h('button', { onclick: () => download('foreign-threads-' + g.id + '.json', JSON.stringify(host.exportRun(), null, 1)) }, 'Download game log (JSON)'));
   ctrl.push(h('button.small', { onclick: () => { setParam('g', null); host = null; render(); } }, 'Other games'));
 
-  const el = h('div', h('div.bar', h('b', GAME_TITLE + ' ' + g.id), h('span.num', 'Phase: ' + phase + (g.round ? ', season ' + g.round : '') + (phase === 'decide' ? ', clock ' + mmss(secs) : '')),
+  const el = h('div', h('div.bar', h('b', GAME_TITLE + ' ' + g.id), h('span.num', 'Phase: ' + phase + (g.round ? ', season ' + g.round : '')),
       h('span', pageMode() === 'local' ? 'LOCAL mode' : 'LIVE mode')),
     h('div.wrap',
       h('div.card', h('h2', 'Links'),
         h('div.kv', h('span', 'Students (team page)'), h('span', h('a', { href: teamUrl(), target: '_blank' }, teamUrl()), ' ', copyBtn(teamUrl(), 'Copy')),
           h('span', 'Projector'), h('span', h('a', { href: projUrl(), target: '_blank' }, projUrl()), ' ', copyBtn(projUrl(), 'Copy')))),
       tasteCard(),
+      phase === 'lobby' ? clockCard(g) : null,
       h('div.card', h('h2', 'Run'), h('div.row', ctrl), busy ? h('p.muted', 'Working...') : null),
       h('div.card', h('h2', 'Teams'), teamTable(),
         h('p.small.muted', 'Students open the team page, type their team code and a name. Up to five seats per team. House teams are scripted, labelled HOUSE and left out of the prize ranking. Teams nobody joins are dropped at Start unless bot-fill is on.'))));
@@ -139,7 +176,8 @@ function render() {
     if (gid) { host = new Host(store); try { await host.load(gid); } catch (e) { toast(e.message, 6000); host = null; setParam('g', null); } }
     if (host) attach();
     await refresh();
-    timer = setInterval(() => { if (host && host.game && host.game.phase === 'decide') render(); }, 1000);
+    timer = every(500, tick);
+    document.addEventListener('visibilitychange', tick);
     window.__host = () => host;
   } catch (e) { app.replaceChildren(h('div.wrap', h('h1', 'Could not start'), h('p.err', friendlyError(e)))); }
 })();
