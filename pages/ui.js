@@ -49,4 +49,5 @@ export const marketName = m => MARKETS[m].name;
 // An event card's image, when it has one (compressed copy in art/web).
 export const eventArt = ev => (ev && ev.art ? webp(ev.art) : null);
 // A lazy image that hides itself if the file is missing.
-export const lazyImg = (src, cls = '', alt = '') => h('img' + (cls ? '.' + cls : ''), { src, alt, loading: 'lazy', decoding: 'async', onerror: ev => { ev.target.style.visibility = 'hidden'; } });
+// eager = true on the projector: one screen, the picture should be there the moment the step opens.
+export const lazyImg = (src, cls = '', alt = '', eager = false) => h('img' + (cls ? '.' + cls : ''), { src, alt, loading: eager ? 'eager' : 'lazy', decoding: 'async', onerror: ev => { ev.target.style.visibility = 'hidden'; } });

@@ -208,7 +208,7 @@ function patternDef(id, pattern, accent) {
   if (pattern === 'check') return `<pattern id="${id}" width="16" height="16" patternUnits="userSpaceOnUse"><rect x="0" width="6" height="16" fill="${accent}" opacity=".55"/><rect y="0" width="16" height="6" fill="${accent}" opacity=".55"/></pattern>`;
   return '';
 }
-function logoArt(art, style, name, colour, size) {
+function logoArt(art, style, name, colour, size, bg = 'none') {
   // centred on 0,0; size = width of the artwork box
   const m = style.mark;
   if (art === 'word') {
@@ -217,10 +217,10 @@ function logoArt(art, style, name, colour, size) {
   }
   if (art === 'both') {
     const ms = size * 0.62, fs = size * 0.24, w = Math.min(size * 1.25, Math.max(size * 0.5, name.length * fs * 0.52));
-    return `<g transform="translate(${-ms / 2} ${-ms * 0.78}) scale(${ms / 40})">${markBody(m, colour, 'none')}</g>` +
+    return `<g transform="translate(${-ms / 2} ${-ms * 0.78}) scale(${ms / 40})">${markBody(m, colour, bg)}</g>` +
       `<text x="0" y="${fs * 1.25}" text-anchor="middle" font-family="Anton, Impact, 'Arial Narrow', sans-serif" font-size="${fs}" fill="${colour}" textLength="${w}" lengthAdjust="spacingAndGlyphs">${esc(name.toUpperCase())}</text>`;
   }
-  return `<g transform="translate(${-size / 2} ${-size / 2}) scale(${size / 40})">${markBody(m, colour, 'none')}</g>`;
+  return `<g transform="translate(${-size / 2} ${-size / 2}) scale(${size / 40})">${markBody(m, colour, bg)}</g>`;
 }
 
 // tiles: {cut, palette, logo, fabric}; look: cleanLook output (or null for defaults); style: {mark, colour}; brandName for the wordmark.
@@ -276,8 +276,8 @@ export function garmentSVG(tiles, look, style, brandName = '', opts = {}) {
   if (!opts.noLogo && tiles.logo !== 'allover' && tiles.logo !== 'none') {
     const logoCol = sketch ? '#1b1a17' : readableOn(st.colour, main);
     const name = brandName || 'Brand';
-    if (!back && tiles.logo === 'big') P.push(`<g transform="translate(${cut.big[0]} ${cut.big[1]})">${logoArt(sketch ? 'mark' : lk.art, st, name, logoCol, 46)}</g>`);
-    if (!back && tiles.logo === 'small') P.push(`<g transform="translate(${cut.small[0]} ${cut.small[1]})">${logoArt('mark', st, name, logoCol, 13)}</g>`);
+    if (!back && tiles.logo === 'big') P.push(`<g transform="translate(${cut.big[0]} ${cut.big[1]})">${logoArt(sketch ? 'mark' : lk.art, st, name, logoCol, 46, sketch ? '#f7f3ea' : main)}</g>`);
+    if (!back && tiles.logo === 'small') P.push(`<g transform="translate(${cut.small[0]} ${cut.small[1]})">${logoArt('mark', st, name, logoCol, 13, sketch ? '#f7f3ea' : main)}</g>`);
   }
   if (sketch && tiles.logo === 'allover' && !opts.noLogo) P.push(`<g clip-path="url(#${id}c)">${[[70, 90], [100, 120], [130, 90], [70, 150], [130, 150], [100, 170]].map(([x, y]) => `<g transform="translate(${x - 6} ${y - 6}) scale(.3)">${markBody(st.mark, '#1b1a17', 'none')}</g>`).join('')}</g>`);
   // the brand label every piece carries: a neck label on the back, a hem tag on the front

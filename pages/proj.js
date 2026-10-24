@@ -30,6 +30,9 @@ async function load() {
   finalSnap = game.phase === 'final' ? ((await store.getSnapshots(gid, { kind: 'final' }))[0] || {}).data || null : null;
 }
 
+// The page redraws on every store event; reusing one <img> per picture keeps it decoded, so a redraw never blanks or re-fetches it.
+const pics = new Map();
+const pic = src => { if (!pics.has(src)) pics.set(src, lazyImg(src, 'cover', '', true)); return pics.get(src); };
 const teamRow = id => teams.find(x => x.team_id === id) || { name: id, brand_id: '', house: false };
 const nameOf = id => teamRow(id).name;
 const styleOf = id => cleanStyle(styles[id], teamRow(id).brand_id);
@@ -71,7 +74,7 @@ function lobby() {
   return h('div.pscreen', mast('Game ' + gid, 'MBA 546 · week 10'),
     h('div.plobby',
       h('div.pl-left', h('h1.ph1', 'Join the season.'), h('p.pl-how', 'Open the team page and type your four-letter team code.'), h('div.pl-url', joinUrl),
-        h('div.pl-img', lazyImg(lobbySrc(), 'cover'))),
+        h('div.pl-img', pic(lobbySrc()))),
       h('div.pl-right', h('div.sec-h', h('span.lbl', 'Brands in the room')),
         h('div.pl-brands', teams.map(t => h('div.pbrand' + (t.house ? '.house' : count(t.team_id) ? '.in' : ''),
           markEl(styleOf(t.team_id), 52), h('div', h('b.wm', t.name), h('span.pb-st', t.house ? 'House brand, plays itself' : count(t.team_id) ? 'Joined' : 'Waiting for a code'),
@@ -83,7 +86,7 @@ function decide() {
   return h('div.pscreen', mast('Season ' + game.round + ' of ' + seasons(), 'Decide'),
     h('div.pdecide',
       h('div.pd-news' + (pub.cards.length > 1 ? '.two' : ''), h('div.sec-h', h('span.lbl', 'The Thread'), h('span.lbl', 'Season ' + game.round)),
-        pub.cards.length ? pub.cards.map(c => h('article.pnews', c.art ? h('div.pn-img', lazyImg(eventArt(c), 'cover')) : null,
+        pub.cards.length ? pub.cards.map(c => h('article.pnews', c.art ? h('div.pn-img', pic(eventArt(c))) : null,
           h('div', h('h2.pn-head', c.headline), c.standfirst ? h('p.pn-stand', c.standfirst) : null, h('p.pn-rule', c.rule)))) : h('p.pn-stand', 'A quiet season. No rule changes.')),
       h('div.pd-teams', h('div.sec-h', h('span.lbl', 'Brands at work'), h('span.lbl', Object.values(ready).filter(Boolean).length + ' locked')),
         h('div.pt-grid', pub.roster.map(r => { const st = r.house ? 'house' : r.bot ? 'bot' : ready[r.id] ? 'locked' : 'deciding';
@@ -108,7 +111,7 @@ function marketCard(m) {
   const size = lines.length <= 3 ? 'xl' : lines.length <= 5 ? 'lg' : 'md';
   return h('div.pscreen', mast('Season ' + game.round + ' · market ' + (MARKET_IDS.indexOf(m) + 1) + '/4', 'The reveal'),
     h('div.pmarket',
-      h('aside.pm-side', h('div.wm.pm-city', { style: 'font-size:' + Math.min(128, Math.floor(400 / (MARKETS[m].name.length * 0.5))) + 'px' }, MARKETS[m].name), h('div.pm-img', lazyImg(streetSrc(m), 'cover')),
+      h('aside.pm-side', h('div.wm.pm-city', { style: 'font-size:' + Math.min(128, Math.floor(400 / (MARKETS[m].name.length * 0.5))) + 'px' }, MARKETS[m].name), h('div.pm-img', pic(streetSrc(m))),
         h('div.kv2.pk', h('span', 'Partner seat'), h('b', M.seat ? nameOf(M.seat) : 'Nobody bid enough'),
           h('span', 'Sellers'), h('b', String(M.crowd)),
           h('span', 'Local rival ' + M.incumbent.name), h('b', pctf(M.incumbent.share) + ' of buyers')),
@@ -157,7 +160,7 @@ function recap() {
           h('div.cc-art', { style: '--lead:' + leadH(cols.length, ps.length > 1) + 'px' }, ps.length ? [garmentEl(ps[0].tiles, lookOf(R, c.team, ps[0].design), st, nameOf(c.team), { cls: 'gsvg lead' }),
             ps.length > 1 ? h('div.cc-sides', ps.slice(1, 3).map(p => garmentEl(p.tiles, lookOf(R, c.team, p.design), st, nameOf(c.team), { cls: 'gsvg side' }))) : null] : h('div.cc-empty', 'No pieces sold')),
           lead ? h('div.cc-tiles', ROWS.map(r => h('div', h('span.lbl', ROW_LABEL[r]), h('b', tileLabel(r, lead.tiles[r]))))) : null,
-          ps.length ? h('div.cc-dest', h('span.lbl', 'Market destination'), ps.flatMap(p => p.markets).map(x => h('div' + (x.win ? '.win' : ''), MARKETS[x.m].name + ' ' + pctf(x.share) + (x.win ? ' · best' : '')))) : null);
+          ps.length ? h('div.cc-dest', h('span.lbl', 'Sold in'), ps.flatMap(p => p.markets).map(x => h('div' + (x.win ? '.win' : ''), MARKETS[x.m].name + ' ' + pctf(x.share) + (x.win ? ' · best' : '')))) : null);
       }))),
     h('div.pfoot', threadBar(evs), h('div.next', nxt ? 'Next: season ' + (game.round + 1) + ' decisions' : 'Next: the final ranking')));
 }

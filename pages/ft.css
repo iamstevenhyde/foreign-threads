@@ -533,7 +533,7 @@ body.page-projector { background: var(--paper); overflow: hidden; }
 .cc-sides .g { height: 104px; }
 .cc-art .g svg { height: 100%; width: auto; }
 .cc-empty { font-family: var(--serif); font-size: 30px; color: var(--muted); align-self: center; }
-.cc-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; border-top: 1px solid var(--line); padding-top: 6px; }
+.cc-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 10px; border-top: 1px solid var(--line); padding-top: 6px; }
 .cc-tiles > div { display: flex; flex-direction: column; min-width: 0; }
 .cc-tiles .lbl { font-size: 16px; }
 .cc-tiles b { font-size: 17px; font-weight: 600; line-height: 1.1; overflow-wrap: anywhere; }

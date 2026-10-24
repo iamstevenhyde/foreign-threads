@@ -141,7 +141,7 @@ function pieces() {
   plan.copy.forEach((c, i) => {
     const w = view.publicWinners.find(x => x.team === c.from_team && x.design === c.design && x.season === c.season);
     const src = lookFromReveal(c.season, c.from_team, c.design);
-    out.push({ id: copyId(c, i), kind: 'copy', idx: i, tiles: w ? w.tiles : null, look: src ? { ...src, name: (src.name || 'Look') } : null, c });
+    out.push({ id: copyId(c, i), kind: 'copy', idx: i, tiles: w ? w.tiles : null, look: src ? { ...src } : w ? cleanLook(null, w.tiles) : null, c });   // a house or bot piece has no look: use its default name
   });
   return out.filter(p => p.tiles || p.kind === 'design');
 }
@@ -181,7 +181,7 @@ function header(withTabs) {
       h('div.tp-meta',
         game.round ? h('div.meta', h('span.lbl', 'Season'), h('b', game.round + ' / ' + seasons)) : null,
         view ? h('div.meta.hide-s', h('span.lbl', 'Cash'), h('b.cash', money1(result && game.phase !== 'decide' ? result.mine.cashEnd : view.cash))) : null,
-        timerChip('.hide-s'))));
+        timerChip(withTabs ? '.hide-s' : ''))));   // on a phone the decision clock lives in the dock; other steps show it here
 }
 function thread() {
   const evs = view.events || [];
@@ -346,10 +346,12 @@ function marketStrip() {
     const pm = view.pub.markets[m], line = plan.markets[m], known = view.tilesKnown[m];
     const status = !line ? 'Not decided' : !line.mode || line.mode === 'none' ? (Number(line.bid) > 0 ? 'Bidding only' : 'Staying out') : MODE_LABEL[line.mode] + ' · ' + line.design;
     return h('button.mcard' + (selM === m ? '.on' : '') + (!line ? '.und' : ''), { onclick: () => { selM = m; safeSet('ft:market', m); render(); } },
-      lazyImg(thumbSrc(m), 'mthumb'),
+      thumb(m),
       h('div.mc-txt', h('span.wm.mc-name', pm.name), h('span.lbl', pm.pool + 'K buyers'), h('span.mc-st', status), h('span.mc-k', known + ' of 4 tastes known')));
   }));
 }
+const thumbs = new Map();   // one <img> per city thumbnail, reused across redraws
+const thumb = m => { if (!thumbs.has(m)) thumbs.set(m, lazyImg(thumbSrc(m), 'mthumb')); return thumbs.get(m); };
 const SOURCE = { start: 'known from the start', season: 'learned by selling here', partner: 'from the partner seat', clue: 'from a clue card', research: 'from research' };
 function tasteCard(m, row) {
   const k = view.known[m][row];
