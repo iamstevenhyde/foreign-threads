@@ -14,6 +14,7 @@ import { makeCode, makeGameId } from './util.js';
 import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js';
 import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs';
 import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js';
+import { cleanLook } from './garment.js';
 
 // The room's hidden tastes never go to the store (Supabase or local) and never into a snapshot. They live in this browser's localStorage under the
 // room id, and the host writes down the short restore code (config/taste.js) so a cleared browser or a second laptop can pick the room up again.
@@ -183,7 +184,30 @@ export class Host {
     }
     const events = st.tables.ww_log.filter(e => e.round === s && (PUBLIC_EVENT_TYPES.has(e.type) || e.type === 'bid' || (e.type === 'carry' && e.payload.phase === 'resolve')))
       .map(e => ({ type: e.type, market: e.market, text: e.text, team: e.team_id, status: e.payload && e.payload.status }));
-    return { season: s, markets, events, winners: res.winners, roster: this.roster() };
+    return { season: s, markets, events, winners: res.winners, roster: this.roster(), looks: this.looksFor(s) };
+  }
+
+  // The cosmetic look (piece name, trim, pattern, logo artwork) of every piece sold in season s, read from the plans the engine kept. Only pieces that
+  // sold are included, so the projector and the Rival Lookbook learn nothing about unsold designs. A copy carries the original's look and copyOf.
+  // House and bot plans have no look; the pages draw a default one. Looks never touch fit, price or anything the engine scores.
+  looksFor(s) {
+    const st = this.state, res = st.history[s], decs = st.tables.ww_decisions, out = {};
+    const planOf = (team, season) => { const d = decs.find(x => x.team_id === team && x.round === season); return d ? d.plan : null; };
+    const lookIn = (team, season, design, tiles, depth = 0) => {
+      const p = planOf(team, season);
+      if (!p) return null;
+      const d = (p.designs || []).find(x => x.id === design);
+      if (d) return d.look ? cleanLook(d.look, d) : null;
+      const i = (p.copy || []).findIndex((x, k) => (x.id || 'X' + (k + 1)) === design);
+      if (i < 0 || depth > 3) return null;
+      const c = p.copy[i];
+      return { ...(lookIn(c.from_team, c.season || season - 1, c.design, tiles, depth + 1) || cleanLook(null, tiles)), copyOf: c.from_team };
+    };
+    for (const m of MARKET_IDS) for (const l of res.markets[m].lines) {
+      const lk = lookIn(l.team, s, l.design, l.tiles);
+      if (lk) (out[l.team] = out[l.team] || {})[l.design] = lk;
+    }
+    return out;
   }
 
   resultFor(id, s) {

@@ -134,6 +134,9 @@ function clockCard(g) {
     h('p.small.muted', 'After Start nothing needs a click. A decision window closes ' + CLOCK.allLockedSeconds + ' seconds after every human team has locked. Pause, +30 s and Skip stay available as overrides. Keep this page open (its own window is best) on the laptop that started the game: this page runs the clock and the engine.'));
 }
 
+// Steven 10/24: after Start nothing should need a click. This line says so on every step; the buttons beside it are emergency overrides.
+const autoBadge = () => host.autoAdvance ? h('span.auto-on', 'Runs itself. Nothing needs a click; the buttons are overrides.') : h('span.err', 'Advance on the clock is OFF: press Skip for every step.');
+
 function render() {
   if (!host) return landing();
   const g = host.game, st = host.state, phase = g.phase, key = stepKey(g);
@@ -149,14 +152,14 @@ function render() {
       onchange: ev => guard(async () => { await store.patchGame(g.id, { settings: { ...g.settings, botFill: ev.target.checked } }); }) }), 'Bot-fill teams nobody joined'));
     ctrl.push(h('button', { disabled: busy, onclick: () => guard(() => host.autoPlay(m => console.log(m))) }, 'Test: play all four seasons with bots'));
   } else if (phase === 'decide') {
-    ctrl.push(h('b', { style: 'font:700 28px monospace' }, h('span#clock', clockText(g))));
+    ctrl.push(h('b.admin-clock', h('span#clock', clockText(g))), autoBadge());
     ctrl.push(...clockBtns());
     ctrl.push(stepBtn('Skip: resolve now', key, k => host.advance(k), 'Optional. The season resolves by itself when the clock runs out.'));
     ctrl.push(h('span.muted', host.autoAdvance ? 'Resolves by itself at zero, or ' + CLOCK.allLockedSeconds + ' s after every human team has locked. ' + (g.settings.savedPlanRuns !== false ? 'A team that has not locked plays its saved plan; with nothing saved, its last plan stands.' : 'A team that never locks keeps its last plan.') : 'Advance on the clock is off: press Skip.'));
   } else if (phase === 'reveal') {
     const idx = g.reveal ? g.reveal.idx : 0;
     ctrl.push(h('span', 'Reveal step ' + (idx + 1) + ' of 5 (' + (idx < 4 ? MARKETS[MARKET_IDS[idx]].name : 'recap: results and carry offers') + ')'));
-    ctrl.push(h('b', { style: 'font:700 28px monospace' }, h('span#clock', clockText(g))));
+    ctrl.push(h('b.admin-clock', h('span#clock', clockText(g))), autoBadge());
     ctrl.push(...clockBtns());
     if (idx > 0) ctrl.push(stepBtn('Back', key, k => host.back(k)));
     ctrl.push(stepBtn(idx < 4 ? 'Skip: next ' + (idx < 3 ? 'market' : 'step (recap)') : st.season >= st.seasons ? 'Skip: finish game' : 'Skip: next season', key, k => host.advance(k),
