@@ -405,41 +405,50 @@ test('carry offers written during the recap are collected when its clock ends; o
   assert.equal(new Set(host.state.tables.ww_deals.map(d => d.deal_id)).size, 2, 'two offers in all, none from the late note');
 });
 
-test('the admin tick falls back to setInterval when the worker fails after starting, fails to start, or never ticks', async () => {
+test('the admin tick never stops: a backstop setInterval runs beside the worker, and an error or a failed start switches to full-speed setInterval', async () => {
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const until = async (cond, ms = 2000) => { const end = Date.now() + ms; while (!cond() && Date.now() < end) await wait(5); return cond(); };   // Windows timers are coarse
   class FakeWorker { constructor() { FakeWorker.last = this; this.terminated = false; } terminate() { this.terminated = true; } }
-  const savedWorker = globalThis.Worker;
+  const savedWorker = globalThis.Worker, savedWarn = console.warn;
+  const warned = [];
+  console.warn = m => warned.push(String(m));
   try {
-    // 1. starts, ticks twice, then throws: the tick carries on from setInterval and the worker is dropped
+    // 1. starts, ticks twice, then reports an error: full-speed setInterval takes over and the worker is dropped
     globalThis.Worker = FakeWorker;
     let n = 0;
-    let stop = every(10, () => n++, { watchdogMs: 5000 });
+    let stop = every(10, () => n++, { backupMs: 100000 });
     const w = FakeWorker.last;
     w.onmessage(); w.onmessage();
     assert.equal(n, 2);
     w.onerror(new Error('worker died'));
     assert.equal(w.terminated, true);
     assert.ok(await until(() => n >= 5), 'setInterval took over (' + n + ' ticks)');
-    const before = n; w.onmessage();
-    assert.equal(n, before, 'a stray message from the dead worker does not add a tick');
     stop();
-    const after = n; await wait(40); assert.equal(n, after, 'stop() stops the fallback too');
+    let before = n; w.onmessage();
+    assert.equal(n, before, 'a stray message from the dead worker adds no tick');
+    before = n; await wait(40); assert.equal(n, before, 'stop() stops the fallback too');
     // 2. the constructor throws (worker blocked): straight to setInterval
     globalThis.Worker = class { constructor() { throw new Error('blocked'); } };
-    n = 0; stop = every(10, () => n++);
+    n = 0; stop = every(10, () => n++, { backupMs: 100000 });
     assert.ok(await until(() => n >= 3), 'fallback when the worker cannot start (' + n + ')'); stop();
-    // 3. starts but never sends a tick: the watchdog falls back
+    // 3. the worker ticks, then dies with no error event (audit N1): the backstop keeps ticking
     globalThis.Worker = FakeWorker;
-    n = 0; stop = every(10, () => n++, { watchdogMs: 30 });
-    assert.ok(await until(() => n >= 3), 'watchdog fallback (' + n + ')'); stop();
-    assert.equal(FakeWorker.last.terminated, true);
-    // 4. a healthy worker: no fallback, ticks come only from the worker
-    n = 0; stop = every(10, () => n++, { watchdogMs: 30 });
-    FakeWorker.last.onmessage();
-    await wait(80);
-    assert.equal(n, 1, 'no setInterval ticks while the worker is healthy');
-    assert.equal(FakeWorker.last.terminated, false);
+    n = 0; stop = every(10, () => n++, { backupMs: 20 });
+    FakeWorker.last.onmessage(); FakeWorker.last.onmessage();     // two worker ticks, then silence
+    const afterWorker = n;
+    assert.ok(await until(() => n >= afterWorker + 3), 'the backstop ticks on after the worker went silent (' + n + ')');
     stop();
-  } finally { if (savedWorker === undefined) delete globalThis.Worker; else globalThis.Worker = savedWorker; }
+    before = n; await wait(60); assert.equal(n, before, 'stop() stops the backstop');
+    // 4. a worker that never ticks at all: the backstop covers it too, and nothing was terminated or warned about
+    warned.length = 0;
+    n = 0; stop = every(10, () => n++, { backupMs: 20 });
+    assert.ok(await until(() => n >= 3), 'backstop with a silent worker (' + n + ')');
+    assert.equal(FakeWorker.last.terminated, false);
+    assert.deepEqual(warned, []);
+    stop();
+    assert.equal(FakeWorker.last.terminated, true, 'stop() ends the worker');
+  } finally {
+    console.warn = savedWarn;
+    if (savedWorker === undefined) delete globalThis.Worker; else globalThis.Worker = savedWorker;
+  }
 });
