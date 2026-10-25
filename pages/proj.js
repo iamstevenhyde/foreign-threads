@@ -1,7 +1,9 @@
 // Projector. Public information only: news, who has locked (never what), per-market reveal of winners and designs, and one final ranking.
+// Every step after Start shows its countdown large in the top right and as a bar along the bottom edge; the admin page moves the game on at zero.
 import { openStore } from './supa.js';
 import { h, $, params, mmss, friendlyError, pageMode } from './util.js';
 import { MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaChips, tag, garmentImg, tilesText, pctf, MODE_LABEL, streetSrc, art, money, GAME_TITLE } from './ui.js';
+import { clockLeft } from './clock.js';
 
 const app = $('#app');
 let store, gid, game = null, pub = null, reveal = null, prevReveal = null, ready = {}, teams = [], seats = [], finalSnap = null;
@@ -26,7 +28,33 @@ async function load() {
 
 const nameOf = id => { const t = teams.find(x => x.team_id === id); return t ? t.name : id; };
 const rosterOf = id => (pub && pub.roster.find(r => r.id === id)) || (reveal && reveal.roster.find(r => r.id === id)) || { house: false, bot: false };
-const mast = (right) => h('div.masthead', h('span', GAME_TITLE + (game.round ? ', season ' + game.round : '')), h('span', right || ''));
+const mast = (right) => h('div.masthead', h('span', GAME_TITLE + (game.round ? ', season ' + game.round : '') + (game.round && game.settings && game.settings.seasons ? ' of ' + game.settings.seasons : '')),
+  h('span', { style: 'margin-left:auto;margin-right:40px' }, right || ''), clockBox());
+
+// The countdown: what the clock is counting to, and the time, updated four times a second by paintClock() without redrawing the page.
+function clockLabel() {
+  const c = game.clock;
+  if (!c) return '';
+  if (c.paused) return 'Paused';
+  if (game.phase === 'decide') return c.early ? 'All teams locked. Reveal in' : 'Lock your plan';
+  if (game.phase === 'reveal') {
+    const idx = (game.reveal && game.reveal.idx) || 0, last = game.round >= ((game.settings && game.settings.seasons) || 4);
+    return idx < 3 ? 'Next market in' : idx === 3 ? 'Recap in' : last ? 'Final ranking in' : 'Season ' + (game.round + 1) + ' opens in';
+  }
+  return '';
+}
+function clockBox() {
+  if (!game.clock) return null;
+  return h('span.pclock' + (game.phase === 'decide' ? '.huge' : ''), h('span.lbl.js-clock-label', clockLabel()), h('span.time.js-clock', mmss(clockLeft(game.clock, Date.now()))));
+}
+function paintClock() {
+  if (!game || !game.clock) return;
+  const c = game.clock, left = clockLeft(c, Date.now()), low = !c.paused && left <= (game.phase === 'decide' ? 30000 : 10000);
+  document.querySelectorAll('.js-clock').forEach(el => { el.textContent = mmss(left); });
+  document.querySelectorAll('.pclock').forEach(el => { el.classList.toggle('low', low); el.classList.toggle('paused', !!c.paused); });
+  const bar = document.querySelector('.js-bar');
+  if (bar) { bar.style.width = (c.total ? Math.max(0, Math.min(1, left / (c.total * 1000))) * 100 : 0).toFixed(2) + '%'; bar.classList.toggle('low', low); }
+}
 
 function lobby() {
   const joinUrl = location.href.replace(/projector\.html.*$/, 'team.html?g=' + gid);
@@ -43,9 +71,8 @@ function lobby() {
 }
 
 function decide() {
-  const left = game.clock ? Math.max(0, game.clock.endsAt - Date.now()) : 0;
   if (!pub) return h('div', mast(), h('h1', 'Getting ready...'));
-  return h('div', mast(h('span.clock', mmss(left))),
+  return h('div', mast(),
     h('div.cols', h('div', h('h2', 'In the news'),
         pub.cards.map(c => h('div', { style: 'display:flex;gap:20px;margin-bottom:20px' }, c.art ? h('img', { src: art(c.art), style: 'width:260px;height:170px;object-fit:cover;border:2px solid #000', onerror: ev => ev.target.remove() }) : null,
           h('div', h('div.lead', { style: 'font-size:40px' }, c.headline), h('div', { style: 'font-size:28px;margin-top:6px' }, c.rule))))),
@@ -97,10 +124,11 @@ function render() {
   else if (game.phase === 'final') body = finalView();
   else body = h('h1', game.phase);
   document.body.classList.toggle('dark', !!isDark());
-  const stage = h('div.stage' + (isDark() ? '.dark' : ''), body);
+  const stage = h('div.stage' + (isDark() ? '.dark' : ''), body, game && game.clock ? h('div.pbar', h('div.js-bar')) : null);
   const sc = Math.min(innerWidth / 1920, innerHeight / 1080);
   stage.style.transform = 'scale(' + sc + ')';
   app.replaceChildren(stage);
+  paintClock();
   document.body.style.background = document.documentElement.style.background = isDark() ? '#15130f' : '#f4f1ea';
 }
 
@@ -108,7 +136,7 @@ function render() {
   try {
     store = await openStore();
     gid = params().get('g');
-    if (gid) { await load(); store.subscribe(gid, async () => { await load(); render(); }); setInterval(() => { if (game && game.phase === 'decide') render(); }, 1000); }
+    if (gid) { await load(); store.subscribe(gid, async () => { await load(); render(); }); setInterval(paintClock, 250); }
     render();
     addEventListener('resize', render);
     window.__proj = () => ({ game, pub, reveal });

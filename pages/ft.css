@@ -72,3 +72,18 @@ body.page-projector { background: #f4f1ea; font-size: 28px; overflow: hidden; }
   .wrap { padding: 10px; } h1 { font-size: 24px; } .design { flex-direction: column; } .garment { width: 100px; height: 125px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* projector countdown (every step after Start): readable from the back of the room */
+.stage .masthead { align-items: center; }
+.stage .pclock { display: inline-flex; align-items: baseline; gap: 18px; font-family: var(--body); font-weight: 700; white-space: nowrap; }
+.stage .pclock .lbl { font-size: 30px; font-weight: 600; }
+.stage .pclock .time { font-size: 96px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stage .pclock.huge .time { font-size: 140px; }
+.stage .pclock.low .time { color: var(--red); }
+.stage.dark .pclock.low .time { color: #ff6b5b; }
+.stage .pclock.paused .time { opacity: .45; }
+.stage .pbar { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; background: #0002; z-index: 5; }
+.stage.dark .pbar { background: #fff2; }
+.stage .pbar > div { height: 100%; width: 100%; background: var(--olive); transition: width .25s linear; }
+.stage.dark .pbar > div { background: var(--acid); }
+.stage .pbar > div.low { background: var(--red); }

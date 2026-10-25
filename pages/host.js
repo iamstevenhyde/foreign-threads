@@ -1,5 +1,7 @@
 // The host: runs the engine in the admin browser and publishes what teams and the projector may see.
 // Teams never touch engine state. They read 'view' and 'result' snapshots and write only their own ww_decisions row.
+// Clock (pages/clock.js): every step after Start has an endsAt in ww_games.clock, and tick() (called by the admin page twice a second) moves the
+// game on when it runs out, so the host never has to press a button after Start. Pause, +30 s and Skip are optional overrides.
 // Snapshots (ww_snapshots): kind 'state' round 0 (full engine state, so an admin reload resumes), 'view' per team per season (teamView at season open),
 // 'public' per season (news + roster), 'reveal' per season (what the projector may show), 'result' per team per season (private results), 'final'.
 
@@ -11,6 +13,7 @@ import { MARKET_IDS } from '../config/markets.js';
 import { makeCode, makeGameId } from './util.js';
 import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js';
 import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs';
+import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js';
 
 // The room's hidden tastes never go to the store (Supabase or local) and never into a snapshot. They live in this browser's localStorage under the
 // room id, and the host writes down the short restore code (config/taste.js) so a cleared browser or a second laptop can pick the room up again.
@@ -21,7 +24,7 @@ const writeSecret = (gid, tastes) => { try { localStorage.setItem(secretKey(gid)
 const PUBLIC_EVENT_TYPES = new Set(['copy', 'suit', 'street']);
 
 export class Host {
-  constructor(store) { this.store = store; this.game = null; this.teams = []; this.state = null; this.meta = null; this.busy = false; this.tastes = null; }
+  constructor(store) { this.store = store; this.game = null; this.teams = []; this.state = null; this.meta = null; this.busy = false; this.tastes = null; this.now = () => Date.now(); this._advancing = false; }
 
   get needsCode() { return !this.tastes; }
   get restoreCode() { return this.tastes ? codeFromTastes(this.tastes) : ''; }
@@ -52,7 +55,8 @@ export class Host {
         house: isHouse, personality: isHouse ? HOUSE.order[i - teams] : '' });
     }
     await store.createGame({ id: gid, seed, team_count: teams + house, bot_count: 0, house_count: house, phase: 'lobby', round: 0, clock: null, reveal: null, rev: 0,
-      status: 'active', admin_key: makeCode(6), settings: { pool, botFill: !!botFill, aiTeams: rows.filter(r => r.house).map(r => r.team_id), seasons: SEASONS } });
+      status: 'active', admin_key: makeCode(6), settings: { pool, botFill: !!botFill, aiTeams: rows.filter(r => r.house).map(r => r.team_id), seasons: SEASONS,
+        autoAdvance: true, clockScale: 1, savedPlanRuns: CLOCK.savedPlanRunsAtZero !== false } });
     for (const r of rows) await store.upsertTeam(r);
     const host = new Host(store);
     await host.load(gid);
@@ -122,22 +126,27 @@ export class Host {
     return this.state.order.map(id => { const t = this.state.teams[id]; return { id, name: t.name, brandId: t.brandId, house: t.house, bot: !!(this.meta.bots[id] && !this.meta.bots[id].house) }; });
   }
 
+  // Each step below moves the engine once, then writes. If a write fails (school wifi), the next tick retries the step: the engine part is skipped
+  // because the engine is already there, and only the writes run again. So a failed write costs a few seconds, never a stuck game.
   async openSeason() {
-    const st = this.state, season = beginSeason(st), s = season.season;
-    this.meta.autoSubs = {};
-    for (const id of st.order) {
-      const bot = this.meta.bots[id];
-      if (!bot) continue;
-      const view = teamView(st, id);
-      const r = bot.house ? housePlan(view, bot.personality) : strategyPlan(bot, view, () => rand(st));
-      this.meta.autoSubs[id] = r.lock ? { plan: r.plan, locked: true, why: r.why, lock_left: 0 } : { plan: r.plan, locked: false, why: '' };
+    const st = this.state;
+    if (st.phase !== 'open') {
+      const season = beginSeason(st);
+      this.meta.autoSubs = {};
+      for (const id of st.order) {
+        const bot = this.meta.bots[id];
+        if (!bot) continue;
+        const view = teamView(st, id);
+        const r = bot.house ? housePlan(view, bot.personality) : strategyPlan(bot, view, () => rand(st));
+        this.meta.autoSubs[id] = r.lock ? { plan: r.plan, locked: true, why: r.why, lock_left: 0 } : { plan: r.plan, locked: false, why: '' };
+      }
+      this.meta.opened = { season: season.season, cards: season.cards.map(c => ({ id: c.id, headline: c.headline, standfirst: c.standfirst, rule: c.rule, art: c.art, markets: c.markets })) };
     }
+    const s = st.season, cards = this.meta.opened && this.meta.opened.season === s ? this.meta.opened.cards : [];
     for (const id of this.meta.humans) await this.store.putSnapshot(this.gid, s, 'view', id, { view: teamView(st, id) });
-    await this.store.putSnapshot(this.gid, s, 'public', '', { season: s, seasons: st.seasons,
-      cards: season.cards.map(c => ({ id: c.id, headline: c.headline, standfirst: c.standfirst, rule: c.rule, art: c.art, markets: c.markets })), roster: this.roster() });
+    await this.store.putSnapshot(this.gid, s, 'public', '', { season: s, seasons: st.seasons, cards, roster: this.roster() });
     await this._saveState();
-    const secs = CLOCK.decideSeconds[s] || 240;
-    await this._patch({ phase: 'decide', round: s, clock: { endsAt: Date.now() + secs * 1000, total: secs }, reveal: null });
+    await this._patch({ phase: 'decide', round: s, clock: this.clockFor({ phase: 'decide', round: s }), reveal: null });
   }
 
   // Which human teams have locked, from the decisions table.
@@ -148,17 +157,20 @@ export class Host {
 
   async resolve() {
     if (this.game.phase !== 'decide') throw new Error('Not in a decision window.');
-    const st = this.state, s = st.season;
-    const rows = await this.store.getDecisions(this.gid, s);
-    const subs = { ...this.meta.autoSubs };
-    for (const id of this.meta.humans) {
-      const d = rows.find(r => r.team_id === id);
-      subs[id] = d ? { plan: d.plan, locked: !!d.locked, why: d.why || '', lock_left: d.lock_left ?? null } : {};
-    }
-    resolveSeason(st, subs);
+    const st = this.state, s = this.game.round;
+    if (st.phase === 'open' && st.season === s) {
+      const rows = await this.store.getDecisions(this.gid, s);
+      const subs = { ...this.meta.autoSubs };
+      const runSaved = this.game.settings.savedPlanRuns !== false;   // a saved plan that was never locked plays when the window closes (core.mjs resolveSeason)
+      for (const id of this.meta.humans) {
+        const d = rows.find(r => r.team_id === id);
+        subs[id] = d ? { plan: d.plan, locked: !!d.locked, why: d.why || '', lock_left: d.lock_left ?? null, ...(runSaved && !d.locked ? { runSaved: true } : {}) } : {};
+      }
+      resolveSeason(st, subs);
+    } else if (!(st.phase === 'resolved' && st.season === s)) throw new Error('The engine (season ' + st.season + ', ' + st.phase + ') and the game (season ' + s + ') disagree. Reload this page.');
     await this.store.putSnapshot(this.gid, s, 'reveal', '', this.revealData(s));
     await this._saveState();
-    await this._patch({ phase: 'reveal', reveal: { season: s, idx: 0 }, clock: null });
+    await this._patch({ phase: 'reveal', reveal: { season: s, idx: 0 }, clock: this.clockFor({ phase: 'reveal', round: s, reveal: { idx: 0 } }) });
   }
 
   revealData(s) {
@@ -180,14 +192,15 @@ export class Host {
     for (const m of MARKET_IDS) { const l = res.markets[m].lines.find(x => x.team === id); if (l) lines[m] = l; }
     const events = st.tables.ww_log.filter(e => e.round === s && e.team_id === id && !['standing'].includes(e.type)).map(e => ({ type: e.type, market: e.market, text: e.text }));
     const dec = st.tables.ww_decisions.find(d => d.team_id === id && d.round === s);
-    return { season: s, mine: res.teams[id], lines, events, seats: res.seats, plan: dec ? dec.plan : null, stood: dec ? dec.stood : false, locked: dec ? dec.locked : false,
+    return { season: s, mine: res.teams[id], lines, events, seats: res.seats, plan: dec ? dec.plan : null, stood: dec ? dec.stood : false, locked: dec ? dec.locked : false, savedRan: !!res.teams[id].savedRan,
       notes: dec ? dec.notes : [], engineError: dec ? dec.engine_error : null, view: teamView(st, id) };
   }
 
   async setReveal(idx) {
     const s = this.state.season;
+    idx = Math.max(0, Math.min(idx, 4));
     if (idx >= 4 && this.meta.resultsPublished < s) await this.publishResults();
-    await this._patch({ reveal: { season: s, idx: Math.max(0, Math.min(idx, 4)) } });
+    await this._patch({ reveal: { season: s, idx }, clock: this.clockFor({ phase: 'reveal', round: s, reveal: { idx } }) });
   }
   async publishResults() {
     const s = this.state.season;
@@ -198,25 +211,30 @@ export class Host {
 
   // Collect carry offers teams wrote during the reveal (decision notes), make them, then open the next season or finish.
   async nextSeason() {
-    const st = this.state, s = st.season;
-    if (this.meta.resultsPublished < s) await this.publishResults();
-    const rows = await this.store.getDecisions(this.gid, s);
-    const byTeam = {};
-    for (const id of this.meta.humans) {
-      const d = rows.find(r => r.team_id === id);
-      const o = ((d && d.notes) || []).filter(n => n && n.type === 'carry' && n.market && n.design).map(n => ({ market: n.market, design: n.design }));
-      if (o.length) byTeam[id] = o;
-    }
-    for (const id of st.order) {
-      const bot = this.meta.bots[id];
-      if (!bot || bot.house) continue;
-      const o = strategyOffers(bot, teamView(st, id));
-      if (o.length) byTeam[id] = o;
-    }
-    const made = makeOffers(st, byTeam);
-    if (s >= st.seasons) { await this.finish(); return made; }
+    const st = this.state, s = this.game.round;     // the season the game row is on; after a failed write the engine may already be one ahead
+    if (st.phase === 'resolved' && st.season === s) {
+      if (this.meta.resultsPublished < s) await this.publishResults();
+      if (this.meta.offersFor !== s) {
+        const rows = await this.store.getDecisions(this.gid, s);
+        const byTeam = {};
+        for (const id of this.meta.humans) {
+          const d = rows.find(r => r.team_id === id);
+          const o = ((d && d.notes) || []).filter(n => n && n.type === 'carry' && n.market && n.design).map(n => ({ market: n.market, design: n.design }));
+          if (o.length) byTeam[id] = o;
+        }
+        for (const id of st.order) {
+          const bot = this.meta.bots[id];
+          if (!bot || bot.house) continue;
+          const o = strategyOffers(bot, teamView(st, id));
+          if (o.length) byTeam[id] = o;
+        }
+        this._made = makeOffers(st, byTeam);
+        this.meta.offersFor = s;
+      }
+      if (s >= st.seasons) { await this.finish(); return this._made; }
+    } else if (!(st.phase === 'open' && st.season === s + 1)) throw new Error('The engine (season ' + st.season + ', ' + st.phase + ') and the game (season ' + s + ') disagree. Reload this page.');
     await this.openSeason();
-    return made;
+    return this._made;
   }
 
   async finish() {
@@ -226,6 +244,74 @@ export class Host {
     await this._saveState();
     await this._patch({ phase: 'final', reveal: null, clock: null });
     try { await this.store.addEvents(this.gid, st.tables.ww_log.map(e => ({ seq: e.seq, round: e.round, team_id: e.team_id, type: e.type, text: e.text, market: e.market, why: e.why, payload: e.payload }))); } catch (e) { console.warn('log not saved to the server', e); }
+  }
+
+  // ---------- the clock ----------
+  // A fresh clock for the step a game is about to enter, at the speed the host chose in the lobby.
+  clockFor(g) {
+    const set = this.game.settings || {}, seasons = set.seasons || SEASONS;
+    const secs = stepSeconds(CLOCK, { phase: g.phase, season: g.round, seasons, idx: (g.reveal && g.reveal.idx) || 0 }, set.clockScale || 1);
+    return newClock(secs, stepKey(g), this.now());
+  }
+  get autoAdvance() { return !!this.game && (this.game.settings || {}).autoAdvance !== false; }
+  due(now = this.now()) { return this.autoAdvance && !this.needsCode && isDue(this.game, now); }   // a laptop without the taste code never runs the engine
+
+  // Called by the admin page about twice a second. Moves the game on one step when the clock of the step it is on has run out; otherwise does nothing.
+  async tick(now = this.now()) {
+    if (!this.due(now)) return false;
+    return this.advance(stepKey(this.game));
+  }
+
+  // One step on: decide -> reveal market 1 -> ... -> market 4 -> recap -> next season's decide (or final). The tick and the Skip button both pass the
+  // step they saw; advance re-reads the game and does nothing if the game is no longer on that step (a double-click, the clock, or another tab got there
+  // first). With no key it moves on from wherever the game is (tests only).
+  async advance(expected) {
+    if (this._advancing) return false;
+    this._advancing = true;
+    try {
+      await this.refreshGame();
+      if (expected && stepKey(this.game) !== expected) return false;
+      const g = this.game;
+      if (g.phase === 'decide') await this.resolve();
+      else if (g.phase === 'reveal') { const idx = g.reveal ? g.reveal.idx : 0; if (idx < 4) await this.setReveal(idx + 1); else await this.nextSeason(); }
+      else return false;
+      return true;
+    } finally { this._advancing = false; }
+  }
+
+  // Back on a reveal, keyed the same way, so a double-click goes back one market, not two.
+  async back(expected) {
+    if (this._advancing) return false;
+    this._advancing = true;
+    try {
+      await this.refreshGame();
+      if (expected && stepKey(this.game) !== expected) return false;
+      const g = this.game;
+      if (g.phase !== 'reveal' || !g.reveal || g.reveal.idx <= 0) return false;
+      await this.setReveal(g.reveal.idx - 1);
+      return true;
+    } finally { this._advancing = false; }
+  }
+
+  async _clock(fn) { await this.refreshGame(); if (!this.game.clock) return; await this._patch({ clock: fn(this.game.clock, this.now()) }); }
+  pause() { return this._clock(pauseClock); }
+  resume() { return this._clock(resumeClock); }
+  addTime(secs = 30) { return this._clock(c => addTime(c, secs)); }
+
+  // Every human team has locked (ready from readiness(), read in season `round`): drop the decision clock to a few seconds. Someone unlocked: give the
+  // full clock back. lockTarget says whether anything would change, without writing, so the admin page can ask twice a second for free.
+  lockTarget(ready, round) {
+    const g = this.game;
+    if (!g || g.phase !== 'decide' || round !== g.round || !g.clock || !this.meta || !this.meta.humans.length || g.settings.autoResolve === false) return null;
+    const all = this.meta.humans.every(id => ready[id] && ready[id].locked);
+    const next = all ? earlyClock(g.clock, CLOCK.allLockedSeconds, this.now()) : restoreClock(g.clock, this.now());   // earlyClock leaves a paused clock alone
+    return next === g.clock ? null : next;
+  }
+  async lockState(ready, round) {
+    const next = this.lockTarget(ready, round);
+    if (!next) return false;
+    await this._patch({ clock: next });
+    return true;
   }
 
   exportRun() {

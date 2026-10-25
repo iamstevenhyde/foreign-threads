@@ -397,11 +397,15 @@ export function resolveSeason(state, subs = {}) {
     let plan = null, stood = false, engineError = null;
     const notes = [];
     const ctx = teamCtx(state, t), env = { season: s, publicWinners: state.publicWinners, house: t.house };
-    if (sub.locked && sub.plan) {
+    // runSaved: the host's clock ran out before this team locked, and the room plays a saved plan in that case (config/rules.js CLOCK.savedPlanRunsAtZero).
+    // The plan is checked like a locked one; the row still says locked: false, so the debrief can tell the two apart.
+    const ranOut = !sub.locked && !!sub.runSaved;
+    if ((sub.locked || ranOut) && sub.plan) {
       const v = validateWith(pub, ctx, sub.plan, env);
       if (v.ok) plan = normPlan(clone(sub.plan));
       else { engineError = v.errors.join('; '); notes.push('rejected: ' + engineError); }
       v.warnings.forEach(w => notes.push(w));
+      if (ranOut) notes.push(v.ok ? 'not locked when time ran out: the saved plan ran' : 'not locked when time ran out, and the saved plan failed the checks');
     } else if (sub.plan) notes.push('saved but never locked');
     if (!plan && t.lastPlan) {
       const stand = normPlan(clone(t.lastPlan)); for (const k of STRIP) stand[k] = [];
@@ -410,10 +414,12 @@ export function resolveSeason(state, subs = {}) {
       else { engineError = (engineError ? engineError + '; ' : '') + 'last plan no longer affordable: ' + v.errors.join('; '); notes.push('last plan could not stand'); }
     }
     if (!plan) plan = normPlan(null);
-    finals[id] = { plan, stood, why: sub.why || '', locked: !!sub.locked, lock_left: sub.lock_left ?? null, engineError, notes };
+    const savedRan = ranOut && !stood && plan.designs.length + plan.copy.length > 0;
+    finals[id] = { plan, stood, savedRan, why: sub.why || '', locked: !!sub.locked, lock_left: sub.lock_left ?? null, engineError, notes };
     log(state, { team: id, type: 'plan', why: finals[id].why,
-      text: stood ? name(state, id) + ': Your last plan stood.' : name(state, id) + (sub.locked && plan.designs.length + plan.copy.length ? ' locked a plan.' : ' sat the season out.'),
-      payload: { stood, locked: !!sub.locked, designs: plan.designs.length, copies: plan.copy.length, markets: Object.keys(plan.markets).filter(m => plan.markets[m].mode && plan.markets[m].mode !== 'none'), engine_error: engineError } });
+      text: stood ? name(state, id) + ': Your last plan stood.' : savedRan ? name(state, id) + ' ran its saved plan when time ran out.' : name(state, id) + (sub.locked && plan.designs.length + plan.copy.length ? ' locked a plan.' : ' sat the season out.'),
+      payload: { stood, locked: !!sub.locked, designs: plan.designs.length, copies: plan.copy.length, markets: Object.keys(plan.markets).filter(m => plan.markets[m].mode && plan.markets[m].mode !== 'none'), engine_error: engineError,
+        ...(ranOut ? { timed_out: true, saved_ran: savedRan } : {}) } });
     state.tables.ww_decisions.push({ game_id: gid, team_id: id, round: s, plan: clone(plan), why: finals[id].why, locked: !!sub.locked, locked_by: null, locked_at: null,
       lock_left: finals[id].lock_left, stood, notes, engine_error: engineError });
   }
@@ -744,7 +750,7 @@ function buildResults(state, c) {
     const t = state.teams[id], rows = seasonRows.filter(r => r.team_id === id);
     const mp = rows.reduce((a, r) => a + r.profit, 0);
     teams[id] = { name: t.name, house: t.house, cashStart: cashStart[id], cashEnd: t.cash, designFees: r6(designFees[id]), marketProfit: r6(mp), seasonProfit: r6(mp - designFees[id]),
-      taxPaid: r6(teamTax[id]), taxByMarket: Object.fromEntries(rows.map(r => [r.market, r.tax_paid])), stood: finals[id].stood, receivables: r6(t.receivables.reduce((a, x) => a + x.amount, 0)),
+      taxPaid: r6(teamTax[id]), taxByMarket: Object.fromEntries(rows.map(r => [r.market, r.tax_paid])), stood: finals[id].stood, ...(finals[id].savedRan ? { savedRan: true } : {}), receivables: r6(t.receivables.reduce((a, x) => a + x.amount, 0)),
       writeOff: writeOff[id] || 0 };
   }
   return { season: s, cards: state.cards, seats, markets, teams, winners: winnersThisSeason };
