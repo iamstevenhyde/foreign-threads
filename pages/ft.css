@@ -320,6 +320,15 @@ h2.piece-name.static { font-weight: 400; }
 .toast { position: fixed; right: 14px; bottom: calc(var(--dock-h) + 30px); background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 2px; max-width: 360px; z-index: 60; }
 #toasts { position: fixed; right: 0; bottom: 0; z-index: 60; }
 
+/* big laptop screens: use the width (the mockups are full-bleed), a larger front view of the piece */
+@media (min-width: 1600px) {
+  .tp-row, .thread, .tp-main, .dock-in { max-width: 1840px; }
+  .studio { grid-template-columns: 300px minmax(0, 1fr) 460px; }
+  .stage-art { grid-template-columns: 1.9fr 1fr; }
+  .stage-art .gsvg.xl { max-height: 560px; }
+  .stage-art .gsvg.lg { max-height: 360px; }
+  .piece-name { font-size: 60px; }
+}
 /* responsive: tablet */
 @media (max-width: 1180px) {
   .studio { grid-template-columns: 220px minmax(0, 1fr); }
