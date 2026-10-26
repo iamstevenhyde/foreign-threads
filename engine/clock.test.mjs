@@ -43,10 +43,10 @@ const planLog = (host, id, s) => host.state.tables.ww_log.find(e => e.type === '
 
 test('clock arithmetic: the configured steps add up to the game length the lobby prints', () => {
   const p = gamePlan(CLOCK, 4, 1);
-  assert.equal(p.steps.length, 24, '4 seasons x (decide + 4 markets + recap)');
-  const expect = (300 + 4 * 60 + 120) + 2 * (240 + 4 * 60 + 120) + (240 + 4 * 60 + 45);
+  assert.equal(p.steps.length, 27, '3 practice steps + 4 seasons x (decide + 4 markets + recap)');
+  const expect = 180 + (360 + 4 * 60 + 120) + 2 * (240 + 4 * 60 + 120) + (240 + 4 * 60 + 45);
   assert.equal(p.total, expect);
-  assert.equal(p.total, 2385, '39:45 with no early locks, inside the 41:00 slot');
+  assert.equal(p.total, 2625, '43:45 with no early locks: 3:00 practice round, a 6:00 season 1 decide');
   assert.equal(gamePlan(CLOCK, 4, 0.5).total, p.steps.reduce((a, x) => a + Math.max(5, Math.round(x.seconds * 0.5)), 0));
   assert.equal(stepSeconds(CLOCK, { phase: 'reveal', season: 4, seasons: 4, idx: 4 }, 1), CLOCK.finalRecapSeconds);
   assert.equal(stepSeconds(CLOCK, { phase: 'decide', season: 1, seasons: 4 }, 0.01), 5, 'never under five seconds');
@@ -87,11 +87,11 @@ test('after Start, zero clicks: the clock alone runs four seasons to the final r
     assert.equal(await host.tick(), false, key + ': nothing happens before zero');
     assert.equal(stepKey(host.game), key);
     assert.equal(await runOut(host, clock), true, key + ': zero moves the game on');
-    assert.ok(seen.length <= 24, 'no runaway');
+    assert.ok(seen.length <= 27, 'no runaway');
   }
-  const expect = [];
+  const expect = [['example:0', 60], ['example:1', 60], ['example:2', 60]];
   for (let s = 1; s <= 4; s++) {
-    expect.push(['decide:' + s, s === 1 ? 300 : 240]);
+    expect.push(['decide:' + s, s === 1 ? 360 : 240]);
     for (let i = 0; i < 4; i++) expect.push(['reveal:' + s + ':' + i, 60]);
     expect.push(['reveal:' + s + ':4', s === 4 ? 45 : 120]);
   }
@@ -112,7 +112,7 @@ test('the lobby speed setting scales every step', async () => {
 
 test('with "advance on the clock" off nothing moves until Skip', async () => {
   const { host, clock } = await room({ humans: 1, house: 1, settings: { autoAdvance: false } });
-  await host.start();
+  await host.start(); await host.skipExample();
   clock.now = host.game.clock.endsAt + 60000;
   assert.equal(await host.tick(), false);
   assert.equal(stepKey(host.game), 'decide:1');
@@ -122,7 +122,7 @@ test('with "advance on the clock" off nothing moves until Skip', async () => {
 
 test('missed deadlines: a saved plan runs, nothing saved means the last plan stands, a broken saved plan falls back, a late lock is ignored', async () => {
   const { host, clock, store } = await room({ humans: 3, house: 1 });
-  await host.start();
+  await host.start(); await host.skipExample();
   // season 1: T1 saves a plan but never locks, T2 never touches the page, T3 locks
   await store.patchDecision(host.gid, 'T1', 1, { plan: ok(), why: 'saved only' });
   await store.patchDecision(host.gid, 'T3', 1, { plan: ok(), why: 'locked', locked: true, lock_left: 100 });
@@ -162,7 +162,7 @@ test('missed deadlines: a saved plan runs, nothing saved means the last plan sta
 
 test('strict rule (setting off): only a locked plan counts, as GAME_SPEC rule 1.7 says', async () => {
   const { host, clock, store } = await room({ humans: 2, house: 1, settings: { savedPlanRuns: false } });
-  await host.start();
+  await host.start(); await host.skipExample();
   await store.patchDecision(host.gid, 'T1', 1, { plan: ok() });
   await runOut(host, clock);
   assert.equal(decision(host, 'T1', 1).plan.designs.length, 0, 'saved but never locked: sits season 1 out');
@@ -172,7 +172,7 @@ test('strict rule (setting off): only a locked plan counts, as GAME_SPEC rule 1.
 
 test('pause holds the step past zero, resume picks up the same time left, +30 s adds time', async () => {
   const { host, clock } = await room({ humans: 1, house: 1 });
-  await host.start();
+  await host.start(); await host.skipExample();
   const ends = host.game.clock.endsAt;
   clock.now = ends - 200000;
   await host.pause();
@@ -202,7 +202,7 @@ test('pause holds the step past zero, resume picks up the same time left, +30 s 
 
 test('every human team locked: the decision clock drops to a few seconds, an unlock gives it back, and the season resolves on its own', async () => {
   const { host, clock, store } = await room({ humans: 2, house: 1 });
-  await host.start();
+  await host.start(); await host.skipExample();
   const full = host.game.clock.endsAt;
   clock.now = full - 100000;
   await store.patchDecision(host.gid, 'T1', 1, { plan: ok(), locked: true });
@@ -234,7 +234,7 @@ test('every human team locked: the decision clock drops to a few seconds, an unl
 
 test('no double step: two ticks at once advance once, and a second host tab that saw the old step does nothing', async () => {
   const { host, clock, store } = await room({ humans: 1, house: 1 });
-  await host.start();
+  await host.start(); await host.skipExample();
   clock.now = host.game.clock.endsAt + 300;
   const other = new Host(store);
   await other.load(host.gid);
@@ -264,7 +264,7 @@ async function playGame({ useClock, inject = [] }) {
     let armed = true;
     store[r.method] = async (...a) => { if (armed && r.when(...a)) { armed = false; fired.push(r.label); throw new Error('injected write failure: ' + r.label); } return orig(...a); };
   }
-  await host.start();
+  await host.start(); await host.skipExample();
   const t1 = plan([D('shell', 'black', 'none', 'recycled')], { berlin: line('D1', { mode: 'partner', bid: 1.6 }), tokyo: line('D1') });
   const carry = { type: 'carry', market: 'berlin', design: { id: 'D1', cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' } };
   let failures = 0, steps = 0;
@@ -312,7 +312,7 @@ test('a failed write never wedges the game: each step retries only its writes, a
 
 test('Skip and Back carry their step: a double-click moves one step, not two', async () => {
   const { host, clock } = await room({ humans: 1, house: 1 });
-  await host.start();
+  await host.start(); await host.skipExample();
   const k = stepKey(host.game);
   assert.equal(await host.advance(k), true);
   assert.equal(await host.advance(k), false, 'the second click still carries decide:1, so it does nothing');
@@ -345,7 +345,7 @@ test('+30 s and Pause are honoured during the all-locked seconds, and an unlock 
 
   // through the host
   const { host, clock, store } = await room({ humans: 2, house: 1 });
-  await host.start();
+  await host.start(); await host.skipExample();
   const fullEnds = host.game.clock.endsAt;
   clock.now = fullEnds - 100000;
   for (const id of ['T1', 'T2']) await store.patchDecision(host.gid, id, 1, { plan: ok(), locked: true });
@@ -377,7 +377,7 @@ test('+30 s and Pause are honoured during the all-locked seconds, and an unlock 
 
 test('carry offers written during the recap are collected when its clock ends; one written after that is not', async () => {
   const { host, clock, store } = await room({ humans: 2, house: 0 });
-  await host.start();
+  await host.start(); await host.skipExample();
   const t1 = plan([D('shell', 'black', 'none', 'recycled')], { berlin: line('D1', { mode: 'partner', bid: 1.6 }) });
   const offer = { type: 'carry', market: 'berlin', design: { id: 'D1', cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' } };
   await store.patchDecision(host.gid, 'T1', 1, { plan: t1, locked: true });

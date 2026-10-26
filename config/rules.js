@@ -78,7 +78,8 @@ export const LATE_PAYMENT_FINAL_HAIRCUT = 0.2;
 // Time. Seconds. 75-minute class (GAME_SPEC.md section 4). After the host presses Start every step runs on this clock and the admin page moves the
 // game on by itself (pages/clock.js); Pause, +30 s and Skip on the admin page are optional. The host can scale every number below in the lobby.
 export const CLOCK = {
-  decideSeconds: { 1: 300, 2: 240, 3: 240, 4: 240 },
+  decideSeconds: { 1: 360, 2: 240, 3: 240, 4: 240 },   // season 1 is a minute longer (10/26): the weights and reveal order are public now and there is more to read
+  exampleSeconds: [60, 60, 60],   // the worked-example round before season 1 (Steven 10/26): choose, sealed bids, reveal, on made-up brands (config/example.js)
   revealSecondsPerMarket: 60,   // one market on the projector; inside the 90 s cap in GAME_SPEC.md
   recapSeconds: 120,            // recap: own results on the team page and carry offers for next season (90 s was judged too short, audit 10/23)
   finalRecapSeconds: 45,        // recap after the last season (no offers), then the final ranking
