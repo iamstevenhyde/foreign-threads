@@ -6,6 +6,7 @@
 import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat } from './supa.js';
 import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js';
 import { clockLeft } from './clock.js';
+import { exampleScreen } from './example.js';
 import { validateWith } from '../engine/core.mjs';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
   MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js';
@@ -162,10 +163,11 @@ function clockLabel() {
   if (!c) return '';
   if (c.paused) return 'Paused';
   if (game.phase === 'decide') return c.early ? 'All locked' : 'Lock in';
+  if (game.phase === 'example') return 'Practice ends in';
   const idx = (game.reveal && game.reveal.idx) || 0;
   return idx < 3 ? 'Next market' : idx === 3 ? 'Results in' : game.round >= ((game.settings && game.settings.seasons) || 4) ? 'Final in' : 'Next season';
 }
-const timerChip = (cls = '') => game.clock && (game.phase === 'decide' || game.phase === 'reveal') ? h('span.timer' + cls, h('span.tl.js-tlabel', clockLabel()), h('b.js-tclock', mmss(clockLeft(game.clock, Date.now())))) : null;
+const timerChip = (cls = '') => game.clock && (game.phase === 'decide' || game.phase === 'reveal' || game.phase === 'example') ? h('span.timer' + cls, h('span.tl.js-tlabel', clockLabel()), h('b.js-tclock', mmss(clockLeft(game.clock, Date.now())))) : null;
 function brandLockup(big) {
   const st = myStyle(), name = team ? BRAND_BY_ID[team.brand_id].name : '';
   return h('button.lockup' + (big ? '.big' : ''), { title: 'Change your brand mark and colour', onclick: () => { brandOpen = !brandOpen; render(); } }, markEl(st, big ? 34 : 26), h('span.lockup-name', name));
@@ -353,6 +355,9 @@ function marketStrip() {
 const thumbs = new Map();   // one <img> per city thumbnail, reused across redraws
 const thumb = m => { if (!thumbs.has(m)) thumbs.set(m, lazyImg(thumbSrc(m), 'mthumb')); return thumbs.get(m); };
 const SOURCE = { start: 'known from the start', season: 'learned by selling here', partner: 'from the partner seat', clue: 'from a clue card', research: 'from research' };
+// Weights and reveal order are public (Steven 10/26): every row shows how much it counts and where it sits in the order rows come to light.
+const wPct = (m, row) => Math.round(view.pub.markets[m].weights[row] * 100) + '%';
+const ordinal = n => ['', 'first', 'second', 'third', 'fourth'][n] || String(n);
 function tasteCard(m, row) {
   const k = view.known[m][row];
   let icon = null;
@@ -367,7 +372,7 @@ function tasteCard(m, row) {
     h('span.lbl', ROW_LABEL[row]),
     k ? icon : h('span.q', '?'),
     h('b', k ? tileLabel(row, k.tile) : 'Hidden'),
-    k ? h('span.tier.' + k.tier.toLowerCase(), k.tier + ' weight') : h('span.tier.none', 'Not yet known'),
+    k ? h('span.tier.' + k.tier.toLowerCase(), k.tier + ' weight · ' + wPct(m, row)) : h('span.tier.none', 'Weight ' + wPct(m, row) + ' · revealed ' + ordinal(view.pub.markets[m].revealOrder.indexOf(row) + 1)),
     h('span.src', k ? SOURCE[k.source] || k.source : 'Sell here, win the partner seat, draw a clue' + (view.pub.markets[m].rules.research ? ' or buy research' : '')));
 }
 function costsList(m) {
@@ -382,6 +387,8 @@ function costsList(m) {
     R.streetCopy ? row('Street knock-offs', 'A design with ' + Math.round(view.pub.COPY.streetThreshold * 100) + '% of buyers is knocked off next season') : null,
     row('Research firm', R.research ? money(view.pub.FOG.researchFee) + ' for one more taste row' : 'None here'),
     R.walkShare ? row('Partner contracts', 'No court to enforce them: a partner keeps ' + Math.round(R.walkShare * 100) + '% of your sales') : null,
+    row('What buyers weigh', ROWS.slice().sort((a, b) => pm.weights[b] - pm.weights[a]).map(r => ROW_LABEL[r] + ' ' + Math.round(pm.weights[r] * 100) + '%').join(' · ') + ' (public)'),
+    row('Order rows come to light', pm.revealOrder.map(r => ROW_LABEL[r]).join(', ') + '. The first ' + pm.startVisible + ' show from the start.'),
     row('Local rival', pm.incumbent.name + ' sells a near-perfect local fit at ' + pm.incumbent.price + ' price'),
     row('Last season', lastHolder ? brandName(lastHolder) + ' held the partner seat; ' + (view.lastCrowd[m] || 0) + ' sellers' : view.season > 1 ? 'Nobody held the partner seat; ' + (view.lastCrowd[m] || 0) + ' sellers' : 'No history yet'));
 }
@@ -405,7 +412,7 @@ function modeCards(m) {
   const cards = [
     { k: 'none', t: 'Stay out', c: '$0 committed', d: 'Keep focus elsewhere. You learn nothing new here this season.' },
     { k: 'ship', t: 'Ship in', c: 'Tax ' + tax + '%' + (pm.rules.dutyShipped ? ' · duty ' + Math.round(pm.rules.dutyShipped * 100) + '%' : ' · no duty'), d: 'Reaches ' + ship + '% as many buyers as a partner. You keep every sale.', off: !pm.rules.modes.includes('ship') && 'No formal distributor here, so nothing can be shipped in.' },
-    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. The highest bid takes the one seat; losers are refunded and their fallback runs.' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
+    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. The highest bid takes the one seat and is PAID (spent, not held); losers are refunded and their fallback runs.' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
     { k: 'own', t: 'Own shop', c: (view.owned[m] ? 'Set-up already paid' : 'Set-up ' + money(view.pub.MODES.own.setup)) + ' · tax ' + tax + '%', d: 'Reaches ' + own + '% of a partner, only ' + ramp + '% in your first season here. Paid at once, no partner share.' },
   ];
   if (offer) cards.push({ k: 'carried', t: 'Carried by ' + brandName(offer.holder), c: 'Fee ' + money(view.pub.CARRY.fee) + ' · tax ' + taxP + '%', d: 'Rides on their partner seat if they win it again. They see your design.' });
@@ -434,7 +441,7 @@ function bidBox(m) {
   const set = v => { v = Math.max(0, Math.round(v * 10) / 10); plan.markets[m] = { mode: 'none', design: designIds()[0] || '', price: 'standard', run: 50, fallback: 'none', ...plan.markets[m], bid: v }; changed(); };
   return h('div.bid' + (need ? '.need' : ''),
     h('div', h('span.lbl', need ? 'Sealed bid for the partner seat' : 'Bid for the seat anyway (optional)'),
-      h('p.note', 'Max ' + money(view.bidCap) + ' (' + Math.round(view.pub.BUDGET.partnerBidCap * 100) + '% of cash), at least ' + money(view.pub.BUDGET.minPartnerBid) + '. Highest bid wins; losers are refunded.')),
+      h('p.note', 'Max ' + money(view.bidCap) + ' (' + Math.round(view.pub.BUDGET.partnerBidCap * 100) + '% of cash), at least ' + money(view.pub.BUDGET.minPartnerBid) + '. Highest bid wins and the winning bid is PAID (spent, not held). A losing bid is refunded.')),
     h('div.stepper', h('button.btn.sq', { 'aria-label': 'Lower bid', onclick: () => set(bid - 0.1) }, '−'),
       h('input', { type: 'number', min: 0, step: 0.1, value: bid.toFixed(1), 'aria-label': 'Bid in $M', onchange: ev => set(Number(ev.target.value) || 0) }),
       h('button.btn.sq', { 'aria-label': 'Raise bid', onclick: () => set(bid + 0.1) }, '+')));
@@ -455,7 +462,7 @@ function markets() {
     h('div.brief',
       h('div.brief-l',
         h('div.brief-head', h('h2.serif-h', pm.name), h('p.lead', pm.blurb), h('p.press' + (pm.pressure === 'high' ? '.hi' : ''), h('span.lbl', 'Pressure to localize'), ' ' + (pm.pressure === 'high' ? 'High. ' : 'Low. ') + pressure)),
-        h('div.sec-h', h('span.lbl', 'What buyers want'), h('span.note', 'Only the rows you have learned')),
+        h('div.sec-h', h('span.lbl', 'What buyers want'), h('span.note', 'Weights are public; a tile shows once you have learned it')),
         h('div.tastes', ROWS.map(r => tasteCard(m, r))),
         h('div.sec-h', h('span.lbl', 'Costs and barriers')),
         costsList(m)),
@@ -482,7 +489,7 @@ function lookbook() {
     if (!R) continue;
     const by = {};
     for (const m of MARKET_IDS) for (const l of (R.markets[m] || { lines: [] }).lines) {
-      if (l.team === seat.team_id) continue;
+      if (l.team === seat.team_id || !l.win) continue;   // winners only (10/26): only a market winning piece is ever shown
       const k = l.team + '|' + l.design;
       by[k] = by[k] || { season: s, team: l.team, design: l.design, tiles: l.tiles, look: R.looks && R.looks[l.team] ? R.looks[l.team][l.design] : null, sold: [], winner: [] };
       by[k].sold.push({ m, share: l.share });
@@ -492,8 +499,8 @@ function lookbook() {
   }
   const full = plan.designs.length + plan.copy.length >= view.pub.DESIGN.maxPerSeason;
   const intro = h('div.lb-intro', h('h2.serif-h', 'What your rivals put out.'),
-    h('p', 'Every piece sold in an earlier reveal. A market\'s best seller can be copied: no design fee, but it counts toward your ' + view.pub.DESIGN.maxPerSeason + ' pieces, the projector names it, and Berlin and Tokyo courts fine a copy ' + money1(view.pub.COPY.suitFine) + '.'));
-  if (!items.length) return h('div.lookbook', intro, h('div.empty', h('p', view.season === 1 ? 'Nothing yet. After the first reveal, every rival piece shows up here.' : 'No rival sold anything in the reveals so far.')));
+    h('p', 'Every winning piece from earlier reveals (only winners are shown). A market\'s best seller can be copied: no design fee, but it counts toward your ' + view.pub.DESIGN.maxPerSeason + ' pieces, the projector names it, and Berlin and Tokyo courts fine a copy ' + money1(view.pub.COPY.suitFine) + '.'));
+  if (!items.length) return h('div.lookbook', intro, h('div.empty', h('p', view.season === 1 ? 'Nothing yet. After the first reveal, each market winning piece shows up here.' : 'No rival has won a market in the reveals so far.')));
   let lastS = 0;
   return h('div.lookbook', intro, items.map(x => {
     const hd = x.season !== lastS ? h('div.lb-season', h('span.lbl', 'Season ' + x.season)) : null; lastS = x.season;
@@ -509,7 +516,7 @@ function lookbook() {
       can ? h('button.btn', { disabled: taken || full, onclick: () => {
         const id = 'X' + (Math.max(0, ...plan.copy.map(copyNo)) + 1);
         plan.copy.push({ id, from_team: x.team, design: x.design, season: x.season, market: x.winner[0] }); selD = id; toast('Copied into your collection as ' + id + '. Place it in a market.'); changed(); } },
-        taken ? 'In your collection' : full ? 'Collection full' : 'Copy this look') : h('span.note', 'Only a best seller can be copied'))];
+        taken ? 'In your collection' : full ? 'Collection full' : 'Copy this look') : h('span.note', 'Taken'))];
   }));
 }
 
@@ -627,6 +634,7 @@ function render() {
   if (ae && (ae.tagName === 'TEXTAREA' || (ae.tagName === 'INPUT' && /text|number|search/.test(ae.type))) && app.contains(ae)) return;
   let body;
   if (game.phase === 'lobby') body = lobbyScreen();
+  else if (game.phase === 'example') body = [header(false), h('main.tp-main', exampleScreen((game.reveal && game.reveal.idx) || 0, 'team'))];
   else if (!view) body = [header(false), h('main.tp-main', h('p', 'Loading your season...'))];
   else if (game.phase === 'final') body = [header(false), finalScreen()];
   else if (game.phase === 'decide') body = plan ? decideScreen() : [header(false), h('main.tp-main', 'Loading...')];

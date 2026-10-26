@@ -95,7 +95,7 @@ test('team-facing state carries no tastes: views, public config, the saved state
     }
   };
 
-  await host.start();
+  await host.start(); await host.skipExample();
   scan('after start');
   // every live team view straight from the engine
   for (const id of host.state.order) {

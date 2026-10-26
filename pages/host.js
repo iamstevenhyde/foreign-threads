@@ -15,6 +15,7 @@ import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config
 import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs';
 import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js';
 import { cleanLook } from './garment.js';
+import { EXAMPLE_STEPS } from '../config/example.js';
 
 // The room's hidden tastes never go to the store (Supabase or local) and never into a snapshot. They live in this browser's localStorage under the
 // room id, and the host writes down the short restore code (config/taste.js) so a cleared browser or a second laptop can pick the room up again.
@@ -120,7 +121,14 @@ export class Host {
     this.state = createGame({ seed: this.game.seed, teams: specs, seasons: this.game.settings.seasons || SEASONS, tastes: this.tastes });
     this.meta = { bots, humans, dropped, autoSubs: {}, resultsPublished: 0 };
     await this._patch({ settings: { ...this.game.settings, aiTeams, active: specs.map(s => s.id) } });
-    await this.openSeason();
+    await this._saveState();
+    await this.openExample(0);
+  }
+
+  // The worked-example round (Steven 10/26): three timed screens on made-up brands before season 1 (config/example.js). No engine step, no score, nothing
+  // written for the teams to read: the pages draw the example from the config, so this only moves the game row through example:0, :1, :2.
+  async openExample(idx) {
+    await this._patch({ phase: 'example', round: 0, reveal: { season: 0, idx }, clock: this.clockFor({ phase: 'example', round: 0, reveal: { idx } }) });
   }
 
   roster() {
@@ -179,16 +187,20 @@ export class Host {
     const markets = {};
     for (const m of MARKET_IDS) {
       const M = res.markets[m];
+      // Steven 10/26: the reveal shows WINNERS ONLY. Every seller appears with brand, entry mode and share (so the room sees who won by how much), but
+      // only the market's winning piece carries its design, tiles and price. Nobody else's design ever leaves the host.
+      const isWin = l => res.winners.some(w => w.market === m && w.team === l.team && w.design === l.design);
       markets[m] = { seat: M.seat || null, crowd: M.crowd, incumbent: { name: st.cfg.MARKETS[m].incumbent.name, share: M.incumbent.share },
-        lines: M.lines.map(l => ({ team: l.team, house: l.house, mode: l.mode, design: l.design, tiles: l.tiles, price: l.price, share: l.share, buyers: l.buyers })) };
+        lines: M.lines.map(l => (isWin(l) ? { team: l.team, house: l.house, mode: l.mode, win: true, design: l.design, tiles: l.tiles, price: l.price, share: l.share, buyers: l.buyers }
+          : { team: l.team, house: l.house, mode: l.mode, win: false, share: l.share, buyers: l.buyers })) };
     }
     const events = st.tables.ww_log.filter(e => e.round === s && (PUBLIC_EVENT_TYPES.has(e.type) || e.type === 'bid' || (e.type === 'carry' && e.payload.phase === 'resolve')))
       .map(e => ({ type: e.type, market: e.market, text: e.text, team: e.team_id, status: e.payload && e.payload.status }));
     return { season: s, markets, events, winners: res.winners, roster: this.roster(), looks: this.looksFor(s) };
   }
 
-  // The cosmetic look (piece name, trim, pattern, logo artwork) of every piece sold in season s, read from the plans the engine kept. Only pieces that
-  // sold are included, so the projector and the Rival Lookbook learn nothing about unsold designs. A copy carries the original's look and copyOf.
+  // The cosmetic look (piece name, trim, pattern, logo artwork) of every WINNING piece in season s, read from the plans the engine kept. Only winning pieces
+  // are included (10/26), so the projector and the Rival Lookbook learn nothing about any other design. A copy carries the original's look and copyOf.
   // House and bot plans have no look; the pages draw a default one. Looks never touch fit, price or anything the engine scores.
   looksFor(s) {
     const st = this.state, res = st.history[s], decs = st.tables.ww_decisions, out = {};
@@ -204,6 +216,7 @@ export class Host {
       return { ...(lookIn(c.from_team, c.season || season - 1, c.design, tiles, depth + 1) || cleanLook(null, tiles)), copyOf: c.from_team };
     };
     for (const m of MARKET_IDS) for (const l of res.markets[m].lines) {
+      if (!res.winners.some(w => w.market === m && w.team === l.team && w.design === l.design)) continue;   // winners only (10/26)
       const lk = lookIn(l.team, s, l.design, l.tiles);
       if (lk) (out[l.team] = out[l.team] || {})[l.design] = lk;
     }
@@ -296,7 +309,8 @@ export class Host {
       await this.refreshGame();
       if (expected && stepKey(this.game) !== expected) return false;
       const g = this.game;
-      if (g.phase === 'decide') await this.resolve();
+      if (g.phase === 'example') { const idx = g.reveal ? g.reveal.idx : 0; if (idx < EXAMPLE_STEPS - 1) await this.openExample(idx + 1); else await this.openSeason(); }
+      else if (g.phase === 'decide') await this.resolve();
       else if (g.phase === 'reveal') { const idx = g.reveal ? g.reveal.idx : 0; if (idx < 4) await this.setReveal(idx + 1); else await this.nextSeason(); }
       else return false;
       return true;
@@ -311,6 +325,7 @@ export class Host {
       await this.refreshGame();
       if (expected && stepKey(this.game) !== expected) return false;
       const g = this.game;
+      if (g.phase === 'example' && g.reveal && g.reveal.idx > 0) { await this.openExample(g.reveal.idx - 1); return true; }
       if (g.phase !== 'reveal' || !g.reveal || g.reveal.idx <= 0) return false;
       await this.setReveal(g.reveal.idx - 1);
       return true;
@@ -345,9 +360,13 @@ export class Host {
       ...exportTables(st), results: st.history, ranking: standings(st) };
   }
 
+  // Test helper: skip the worked-example round straight to season 1.
+  async skipExample() { while (this.game.phase === 'example') await this.advance(); }
+
   // Test helper: nobody is human, so run every season with the bots.
   async autoPlay(progress = () => {}) {
     if (this.game.phase === 'lobby') await this.start();
+    if (this.game.phase === 'example') await this.openSeason();
     while (this.game.phase !== 'final') {
       if (this.game.phase === 'decide') await this.resolve();
       progress('season ' + this.state.season + ' resolved');

@@ -7,6 +7,7 @@ import { h, $, $$, params, mmss, friendlyError } from './util.js';
 import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js';
 import { cleanStyle, cleanLook } from './garment.js';
 import { clockLeft } from './clock.js';
+import { exampleScreen } from './example.js';
 
 const app = $('#app');
 let store, gid, game = null, pub = null, reveal = null, prevReveal = null, ready = {}, teams = [], seats = [], finalSnap = null, styles = {};
@@ -45,6 +46,7 @@ function clockLabel() {
   const c = game.clock;
   if (!c) return '';
   if (c.paused) return 'Paused';
+  if (game.phase === 'example') return ((game.reveal && game.reveal.idx) || 0) < 2 ? 'Next: the practice continues' : 'Next: season 1';
   if (game.phase === 'decide') return c.early ? 'All locked. Reveal in' : 'Lock your plan';
   if (game.phase === 'reveal') {
     const idx = (game.reveal && game.reveal.idx) || 0, last = game.round >= seasons();
@@ -97,7 +99,7 @@ function decide() {
 function spreadCol(R, l, win, size) {
   const st = styleOf(l.team), lk = cleanLook(lookOf(R, l.team, l.design), l.tiles), copied = lookOf(R, l.team, l.design) && lookOf(R, l.team, l.design).copyOf;
   return h('article.scol' + (win ? '.win' : ''),
-    win ? h('div.ribbon', 'Best seller') : h('div.ribbon.blank', ''),
+    win ? h('div.ribbon', 'Winner') : h('div.ribbon.blank', ''),
     garmentEl(l.tiles, lookOf(R, l.team, l.design), st, nameOf(l.team), { cls: 'gsvg ' + size }),
     h('div.sc-brand', markEl(st, 30), h('b.wm', nameOf(l.team)), tag(rosterOf(l.team))),
     h('div.sc-name', lk.name + (copied ? ' (copy)' : '')),
@@ -108,16 +110,23 @@ function marketCard(m) {
   const M = reveal.markets[m], win = reveal.winners.find(w => w.market === m);
   const evs = reveal.events.filter(e => e.market === m);
   const lines = [...M.lines].sort((a, b) => b.share - a.share);
-  const size = lines.length <= 3 ? 'xl' : lines.length <= 5 ? 'lg' : 'md';
+  const wl = lines.find(l => l.win);
+  // Steven 10/26: winners only. The winning piece is drawn; every seller (and the local rival) shows as brand, entry mode and percent of buyers.
+  const rows = [...lines.map(l => ({ name: nameOf(l.team), st: styleOf(l.team), mode: MODE_LABEL[l.mode], share: l.share, win: !!l.win, tg: rosterOf(l.team) })),
+    { name: M.incumbent.name, st: null, mode: 'Local rival', share: M.incumbent.share, win: false, tg: {} }].sort((a, b) => b.share - a.share);
+  const top = Math.max(0.01, ...rows.map(r => r.share));
   return h('div.pscreen', mast('Season ' + game.round + ' · market ' + (MARKET_IDS.indexOf(m) + 1) + '/4', 'The reveal'),
     h('div.pmarket',
       h('aside.pm-side', h('div.wm.pm-city', { style: 'font-size:' + Math.min(128, Math.floor(400 / (MARKETS[m].name.length * 0.5))) + 'px' }, MARKETS[m].name), h('div.pm-img', pic(streetSrc(m))),
         h('div.kv2.pk', h('span', 'Partner seat'), h('b', M.seat ? nameOf(M.seat) : 'Nobody bid enough'),
-          h('span', 'Sellers'), h('b', String(M.crowd)),
-          h('span', 'Local rival ' + M.incumbent.name), h('b', pctf(M.incumbent.share) + ' of buyers')),
+          h('span', 'Sellers'), h('b', String(M.crowd))),
         bidLines(evs.filter(e => e.type === 'bid'))),
-      h('section.spread' + (lines.length > 5 ? '.many' : ''),
-        lines.length ? lines.map(l => spreadCol(reveal, l, win && win.team === l.team && win.design === l.design, size)) : h('div.nobody', 'Nobody sold here this season.'))),
+      h('section.spread.winonly',
+        wl ? spreadCol(reveal, wl, true, 'xl') : h('div.nobody', 'Nobody sold here this season.'),
+        h('div.shares', h('span.lbl', 'Share of buyers'),
+          rows.map(r => h('div.shr' + (r.win ? '.win' : ''), h('div.shr-n', r.st ? markEl(r.st, 28) : h('span.mk'), h('b.wm', r.name), tag(r.tg)), h('div.shr-m', r.mode),
+            h('div.shr-bar', h('i', { style: 'width:' + Math.round(r.share / top * 100) + '%' })), h('b.shr-p', pctf(r.share)))),
+          h('p.shr-note', 'Only the winning piece is shown. Everyone else\'s design stays private.')))),
     threadBar(evs.filter(e => e.type !== 'bid')));
 }
 // Sealed bids, shortest first form: who bid what. At most four lines so the side panel never runs off the screen.
@@ -136,6 +145,7 @@ const leadH = (n, sides) => { const per = n > 6 ? 6 : Math.max(1, n), colW = 184
 function recap() {
   const R = reveal, by = {};
   for (const m of MARKET_IDS) for (const l of R.markets[m].lines) {
+    if (!l.win) continue;   // winners only (10/26): a brand's collection here is the pieces that won a market
     const t = by[l.team] = by[l.team] || { team: l.team, pieces: {}, best: 0 };
     const p = t.pieces[l.design] = t.pieces[l.design] || { design: l.design, tiles: l.tiles, markets: [], buyers: 0 };
     p.markets.push({ m, share: l.share, win: R.winners.some(w => w.market === m && w.team === l.team && w.design === l.design) });
@@ -148,7 +158,7 @@ function recap() {
     .sort((a, b) => (!!a.sat - !!b.sat) || (!!rosterOf(a.team).house - !!rosterOf(b.team).house) || sold(b) - sold(a));
   const evs = R.events.filter(e => e.type !== 'bid');
   const nxt = game.round < seasons();
-  return h('div.pscreen', mast('Season ' + game.round + ' of ' + seasons(), 'Live collection reveal'),
+  return h('div.pscreen', mast('Season ' + game.round + ' of ' + seasons(), 'The winning pieces'),
     h('div.precap',
       h('h1.season-out', 'The season is out.'),
       h('div.collection' + (cols.length > 6 ? '.two' : ''), cols.map(c => {
@@ -156,11 +166,11 @@ function recap() {
         const lead = ps[0];
         return h('article.ccol' + (c.sat ? '.sat' : ''),
           h('div.cc-brand', h('b.wm', nameOf(c.team)), markEl(st, 34)), tag(rosterOf(c.team)),
-          lead ? h('div.cc-name', cleanLook(lookOf(R, c.team, lead.design), lead.tiles).name) : h('div.cc-name', 'Sat this season out'),
+          lead ? h('div.cc-name', cleanLook(lookOf(R, c.team, lead.design), lead.tiles).name) : h('div.cc-name', 'No market won'),
           h('div.cc-art', { style: '--lead:' + leadH(cols.length, ps.length > 1) + 'px' }, ps.length ? [garmentEl(ps[0].tiles, lookOf(R, c.team, ps[0].design), st, nameOf(c.team), { cls: 'gsvg lead' }),
-            ps.length > 1 ? h('div.cc-sides', ps.slice(1, 3).map(p => garmentEl(p.tiles, lookOf(R, c.team, p.design), st, nameOf(c.team), { cls: 'gsvg side' }))) : null] : h('div.cc-empty', 'No pieces sold')),
+            ps.length > 1 ? h('div.cc-sides', ps.slice(1, 3).map(p => garmentEl(p.tiles, lookOf(R, c.team, p.design), st, nameOf(c.team), { cls: 'gsvg side' }))) : null] : h('div.cc-empty', 'No winning piece')),
           lead ? h('div.cc-tiles', ROWS.map(r => h('div', h('span.lbl', ROW_LABEL[r]), h('b', tileLabel(r, lead.tiles[r]))))) : null,
-          ps.length ? h('div.cc-dest', h('span.lbl', 'Sold in'), ps.flatMap(p => p.markets).map(x => h('div' + (x.win ? '.win' : ''), MARKETS[x.m].name + ' ' + pctf(x.share) + (x.win ? ' · best' : '')))) : null);
+          ps.length ? h('div.cc-dest', h('span.lbl', 'Won'), ps.flatMap(p => p.markets).map(x => h('div.win', MARKETS[x.m].name + ' ' + pctf(x.share)))) : null);
       }))),
     h('div.pfoot', threadBar(evs), h('div.next', nxt ? 'Next: season ' + (game.round + 1) + ' decisions' : 'Next: the final ranking')));
 }
@@ -169,7 +179,7 @@ function recap() {
 function leadPiece(team) {
   if (!reveal) return null;
   let best = null;
-  for (const m of MARKET_IDS) for (const l of (reveal.markets[m] || { lines: [] }).lines) if (l.team === team && (!best || l.buyers > best.buyers)) best = l;
+  for (const m of MARKET_IDS) for (const l of (reveal.markets[m] || { lines: [] }).lines) if (l.win && l.team === team && (!best || l.buyers > best.buyers)) best = l;
   return best;
 }
 function finalView() {
@@ -188,6 +198,7 @@ function render() {
   let body;
   if (!game) body = h('div.pscreen', h('h1.ph1', 'No game ' + (gid || '') + ' found. Add ?g=GAMEID to the address.'));
   else if (game.phase === 'lobby') body = lobby();
+  else if (game.phase === 'example') body = h('div.pscreen', mast('Practice round', 'A worked example'), exampleScreen((game.reveal && game.reveal.idx) || 0, 'proj'));
   else if (game.phase === 'decide') body = decide();
   else if (game.phase === 'reveal') body = !reveal ? h('div.pscreen', mast('Season ' + game.round), h('h1.ph1', 'The season is closing...')) : (game.reveal && game.reveal.idx < 4 ? marketCard(MARKET_IDS[game.reveal.idx]) : recap());
   else if (game.phase === 'final') body = finalView();

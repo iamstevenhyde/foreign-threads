@@ -69,13 +69,15 @@ export function seasonConfig(cardIds) {
   return cfg;
 }
 
-// What a team is allowed to know about the rules in force: no taste, no weights, no reveal order.
+// What a team is allowed to know about the rules in force: no taste. Steven 10/26: weights and reveal order are PUBLIC (which rows matter most in each city,
+// and the order the hidden rows come to light); only WHICH tile a city likes stays hidden.
 export function publicConfig(cfg) {
   const markets = {};
   for (const id of MARKET_IDS) {
     const m = cfg.MARKETS[id];
     markets[id] = { id, name: m.name, distance: m.distance, taxBySeason: m.taxBySeason, priceFit: m.priceFit, pool: cfg.POOLS[id], rules: m.rules, incumbent: m.incumbent, blurb: m.blurb,
-      pressure: m.pressure || null, tolerance: m.tolerance || 0, shipReachBonus: m.shipReachBonus || 0 };
+      pressure: m.pressure || null, tolerance: m.tolerance || 0, shipReachBonus: m.shipReachBonus || 0,
+      weights: { ...m.weights }, revealOrder: [...m.revealOrder], startVisible: MK.startVisible(id) };
   }
   return {
     markets, RUNS: cfg.RUNS, PRICES: cfg.PRICES, TIER_COST: cfg.TIER_COST, DESIGN: cfg.DESIGN, BUDGET: cfg.BUDGET, MODES: cfg.MODES, SHARE: cfg.SHARE, CARRY: cfg.CARRY,

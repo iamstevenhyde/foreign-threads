@@ -33,7 +33,7 @@ async function toRecap(host) { while (!(host.game.phase === 'reveal' && host.gam
 test('looks: the reveal carries the look of every piece that sold, nothing for unsold pieces, and no tastes', async () => {
   const { store, host } = await room();
   await store.patchDecision(host.gid, 'T1', 0, { plan: { style: { mark: 'wave', colour: '#13808a' } } });   // a brand style row (round 0)
-  await host.start();
+  await host.start(); await host.skipExample();
   const sold = withLook(D('shell', 'bright', 'big', 'performance', 'D1'), { name: 'Tokyo Storm', trim: 'cobalt', pattern: 'stripe', art: 'both' });
   const unsold = withLook(D('resort', 'pastel', 'small', 'light', 'D2'), { name: 'Secret Piece', trim: 'pink', pattern: 'check', art: 'word' });
   await store.patchDecision(host.gid, 'T1', 1, { ...lock(plan([sold, unsold], { berlin: line('D1'), saopaulo: line('D1') })) });
@@ -53,7 +53,7 @@ test('looks: the reveal carries the look of every piece that sold, nothing for u
 
 test('looks: a copy shows the original look and names the brand it copied', async () => {
   const { store, host } = await room();
-  await host.start();
+  await host.start(); await host.skipExample();
   const a = withLook(D('shell', 'bright', 'big', 'performance', 'D1'), { name: 'Tokyo Storm', trim: 'cobalt', pattern: 'stripe', art: 'both' });
   await store.patchDecision(host.gid, 'T1', 1, { ...lock(plan([a], { berlin: line('D1'), tokyo: line('D1'), saopaulo: line('D1'), nairobi: line('D1', { mode: 'own' }) })) });
   await store.patchDecision(host.gid, 'T2', 1, { ...lock(plan([D('hoodie', 'earth', 'small', 'heavy')], { tokyo: line('D1', { run: 10 }) })) });

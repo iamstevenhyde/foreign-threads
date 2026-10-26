@@ -129,7 +129,7 @@ function clockCard(g) {
       h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: set.autoAdvance !== false, onchange: ev => setSetting({ autoAdvance: ev.target.checked }) }), 'Advance on the clock (off = press Skip for every step)'),
       h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: set.savedPlanRuns !== false, onchange: ev => setSetting({ savedPlanRuns: ev.target.checked }) }), 'At zero, a team that has not locked plays its saved plan')),
     h('p', 'Each season: decide ' + mmss(secsOf(s1, 'decide') * 1000) + ' in season 1 and ' + mmss(secsOf(s2, 'decide') * 1000) + ' after, then ' + mmss(secsOf(s1, 'market 1') * 1000) + ' per market on the projector, then a ' + mmss(secsOf(s1, 'recap') * 1000) +
-      ' recap for results and carry offers (' + mmss(plan.steps[plan.steps.length - 1].seconds * 1000) + ' after the last season). Whole game: ', h('b', mmss(plan.total * 1000)), ' if nobody locks early.'),
+      ' recap for results and carry offers (' + mmss(plan.steps[plan.steps.length - 1].seconds * 1000) + ' after the last season), after a ' + mmss(plan.steps.filter(x => x.season === 0).reduce((a, x) => a + x.seconds, 0) * 1000) + ' practice round. Whole game: ', h('b', mmss(plan.total * 1000)), ' if nobody locks early.'),
     h('p', h('b', 'Run exactly one admin window for this game.'), ' A second admin tab or laptop would also run the clock; close it before Start.'),
     h('p.small.muted', 'After Start nothing needs a click. A decision window closes ' + CLOCK.allLockedSeconds + ' seconds after every human team has locked. Pause, +30 s and Skip stay available as overrides. Keep this page open (its own window is best) on the laptop that started the game: this page runs the clock and the engine.'));
 }
@@ -146,11 +146,18 @@ function render() {
     g.clock.paused ? h('button', { disabled: busy, onclick: () => guard(() => host.resume()) }, 'Resume clock') : h('button', { disabled: busy, onclick: () => guard(() => host.pause()) }, 'Pause clock'),
     h('button', { disabled: busy, onclick: () => guard(() => host.addTime(30)) }, '+30 s')] : [];
   if (phase === 'lobby') {
-    ctrl.push(h('button.primary', { disabled: busy || host.needsCode, onclick: () => guard(() => host.start()) }, 'Start game (season 1)'));
+    ctrl.push(h('button.primary', { disabled: busy || host.needsCode, onclick: () => guard(() => host.start()) }, 'Start game (practice round, then season 1)'));
     ctrl.push(h('button', { disabled: busy || host.teams.filter(t => t.house).length >= HOUSE.maxCount, onclick: () => guard(() => host.addHouse()) }, 'Add a house (AI) team'));
     ctrl.push(h('label.small', { style: 'display:flex;gap:6px;align-items:center;margin:0' }, h('input', { type: 'checkbox', checked: !!g.settings.botFill,
       onchange: ev => guard(async () => { await store.patchGame(g.id, { settings: { ...g.settings, botFill: ev.target.checked } }); }) }), 'Bot-fill teams nobody joined'));
     ctrl.push(h('button', { disabled: busy, onclick: () => guard(() => host.autoPlay(m => console.log(m))) }, 'Test: play all four seasons with bots'));
+  } else if (phase === 'example') {
+    const idx = g.reveal ? g.reveal.idx : 0;
+    ctrl.push(h('span', 'Practice round, step ' + (idx + 1) + ' of 3 (made-up brands, nothing counts)'));
+    ctrl.push(h('b.admin-clock', h('span#clock', clockText(g))), autoBadge());
+    ctrl.push(...clockBtns());
+    if (idx > 0) ctrl.push(stepBtn('Back', key, k => host.back(k)));
+    ctrl.push(stepBtn(idx < 2 ? 'Skip: next practice step' : 'Skip: start season 1', key, k => host.advance(k), 'Optional. The practice round moves on by itself.'));
   } else if (phase === 'decide') {
     ctrl.push(h('b.admin-clock', h('span#clock', clockText(g))), autoBadge());
     ctrl.push(...clockBtns());

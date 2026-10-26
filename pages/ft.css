@@ -569,3 +569,59 @@ body.page-projector { background: var(--paper); overflow: hidden; }
 .pf-rank li.first .pr, .pf-rank li.first .rk { color: var(--cobalt); }
 .pf-house { color: var(--muted); font-size: 28px; display: flex; flex-direction: column; gap: 8px; }
 .pf-house > div { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; }
+/* worked-example round (10/26), appended into ft.css by the edit step */
+.ex { max-width: 1480px; margin: 0 auto; padding: 22px 24px 40px; }
+.ex-head { font-size: 54px; margin: 4px 0 0; }
+.ex-note { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.ex-say p { font-size: 19px; max-width: 1000px; }
+.ex-body { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 14px; }
+.ex-cards { display: flex; gap: 24px; flex-wrap: wrap; }
+.ex-card { background: var(--card); border: 1.5px solid var(--line-2); padding: 16px; width: 340px; display: flex; flex-direction: column; gap: 6px; }
+.ex-card .ex-g { width: 190px; margin: 0 auto; }
+.ex-brand { display: flex; align-items: center; gap: 8px; } .ex-brand b { font-size: 28px; }
+.ex-pname { font-family: var(--serif); font-size: 24px; }
+.ex-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 14px; } .ex-tiles b { display: block; }
+.ex-plan { border-top: 1px solid var(--line); padding-top: 8px; font-size: 15px; }
+.ex-weights { background: var(--card); border: 1.5px solid var(--line-2); padding: 14px 16px; min-width: 360px; }
+.exw-row { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.exw { display: grid; grid-template-columns: 70px 56px 1fr; align-items: center; gap: 8px; } .exw b { font-family: var(--display); font-weight: 400; font-size: 24px; } .exw i { height: 14px; background: var(--cobalt); display: block; }
+.ex-bids { display: flex; flex-direction: column; gap: 16px; min-width: 560px; }
+.ex-bid { background: var(--card); border: 1.5px solid var(--line-2); padding: 16px 18px; } .ex-bid.win { border-color: var(--cobalt); border-width: 3px; }
+.eb-top { display: flex; align-items: center; gap: 10px; } .eb-top b { font-size: 34px; } .eb-amt { margin-left: auto; font-family: var(--display); font-size: 44px; }
+.ex-bid i { display: block; height: 16px; background: var(--ink); margin: 8px 0; } .ex-bid.win i { background: var(--cobalt); }
+.ex-bid p { margin: 0; font-size: 18px; }
+.ex-paid { background: var(--ink); color: var(--paper); padding: 16px 20px; max-width: 420px; } .ex-paid .lbl { color: var(--chip); } .ex-paid b { display: block; font-family: var(--serif); font-weight: 400; font-size: 32px; line-height: 1.1; margin-top: 6px; }
+.ex-win { background: var(--card); border: 3px solid var(--cobalt); padding: 0 16px 16px; width: 360px; text-align: center; }
+.ex-win .ribbon { background: var(--cobalt); color: #fff; margin: 0 -16px 10px; padding: 6px; font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+.ex-win .ex-gw { width: 230px; margin: 0 auto; } .ex-win .ex-brand { justify-content: center; }
+.ex-big { font-family: var(--display); font-size: 84px; line-height: 1; color: var(--cobalt); }
+.ex-shares { background: var(--card); border: 1.5px solid var(--line-2); padding: 14px 18px; min-width: 520px; }
+.exs { display: grid; grid-template-columns: 170px 1fr 70px; align-items: center; gap: 10px; margin-top: 10px; } .exs b { font-size: 26px; } .exs i { height: 26px; background: var(--ink); display: block; } .exs.win i { background: var(--cobalt); } .exs span { font-family: var(--display); font-size: 34px; }
+.ex.proj { max-width: none; padding: 20px 56px; flex: 1; }
+.ex.proj .ex-head { font-size: 96px; } .ex.proj .ex-say p { font-size: 30px; max-width: 1500px; } .ex.proj .ex-note { font-size: 16px; }
+.ex.proj .ex-card { width: 520px; } .ex.proj .ex-card .ex-g { width: 260px; } .ex.proj .ex-brand b { font-size: 40px; } .ex.proj .ex-pname { font-size: 34px; } .ex.proj .ex-tiles { font-size: 20px; } .ex.proj .ex-plan { font-size: 22px; }
+.ex.proj .exw b { font-size: 36px; } .ex.proj .exw { grid-template-columns: 100px 80px 1fr; } .ex.proj .ex-weights { min-width: 560px; }
+.ex.proj .ex-bid { padding: 22px 26px; } .ex.proj .eb-top b { font-size: 52px; } .ex.proj .eb-amt { font-size: 72px; } .ex.proj .ex-bid p { font-size: 28px; } .ex.proj .ex-bids { min-width: 1000px; }
+.ex.proj .ex-paid { max-width: 700px; } .ex.proj .ex-paid b { font-size: 48px; }
+.ex.proj .ex-win { width: 520px; } .ex.proj .ex-win .ex-gw { width: 300px; } .ex.proj .ex-big { font-size: 130px; } .ex.proj .ex-win .ex-brand b { font-size: 44px; }
+.ex.proj .ex-shares { min-width: 900px; } .ex.proj .exs { grid-template-columns: 260px 1fr 120px; } .ex.proj .exs b { font-size: 40px; } .ex.proj .exs i { height: 40px; } .ex.proj .exs span { font-size: 60px; }
+@media (max-width: 800px) { .exs, .ex.team .exs { grid-template-columns: 90px minmax(0, 1fr) 56px; } .exw { grid-template-columns: 60px 48px minmax(0, 1fr); } .ex-card, .ex-win, .ex-shares, .ex-bids, .ex-weights { width: 100%; min-width: 0; } }
+
+/* winners-only market reveal (10/26) */
+.spread.winonly { align-items: flex-start; gap: 40px; padding: 0 40px; }
+.spread.winonly .scol { flex: 0 0 520px; max-width: 520px; }
+.shares { flex: 1; min-width: 0; padding-top: 22px; }
+.shr { display: grid; grid-template-columns: 360px 150px 1fr 120px; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.shr-n { display: flex; align-items: center; gap: 10px; } .shr-n b { font-size: 34px; }
+.shr-m { font-size: 20px; color: var(--muted); }
+.shr-bar { height: 34px; } .shr-bar i { display: block; height: 100%; background: var(--ink); }
+.shr.win .shr-bar i { background: var(--cobalt); }
+.shr-p { font-family: var(--display); font-weight: 400; font-size: 56px; text-align: right; line-height: 1; } .shr.win .shr-p { color: var(--cobalt); }
+.shr-note { font-size: 20px; color: var(--muted); margin-top: 16px; }
+/* projector example fit (1080 tall stage) */
+.ex.proj { padding-top: 12px; padding-bottom: 20px; }
+.ex.proj .ex-head { font-size: 68px; margin: 0; } .ex.proj .ex-say p { font-size: 25px; margin-bottom: .3em; } .ex.proj .ex-body { margin-top: 8px; gap: 24px; }
+.ex.proj .ex-win { width: 460px; } .ex.proj .ex-win .ex-gw { width: 190px; } .ex.proj .ex-big { font-size: 90px; } .ex.proj .ex-win .ex-brand b { font-size: 36px; } .ex.proj .ex-pname { font-size: 28px; }
+.ex.proj .ex-card .ex-g { width: 190px; } .ex.proj .ex-card { width: 480px; padding: 12px 16px; }
+.ex.proj .ex-bid p { font-size: 24px; } .ex.proj .ex-bids { min-width: 900px; }
+.ex.proj .ex-shares { min-width: 800px; } .ex.proj .exs i { height: 34px; } .ex.proj .exs span { font-size: 52px; }

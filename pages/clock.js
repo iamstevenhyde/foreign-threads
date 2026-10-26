@@ -2,6 +2,7 @@
 // A clock lives in ww_games.clock: {endsAt, total, paused, remaining, step, early, fullEndsAt}. The admin browser is the only writer and the only page
 // that moves the game on; the projector and the team pages only count down from endsAt. A reload of any page reads the same row, so nothing resets.
 //
+// Before season 1 there is a worked-example round: 'example:0'..'example:2' (made-up brands, no engine), then 'decide:1'.
 // Steps of a season: 'decide:S', then 'reveal:S:0'..'reveal:S:3' (one market each), then 'reveal:S:4' (the recap: own results on the team pages and
 // carry offers for next season). The recap of the last season leads to 'final', which has no clock.
 
@@ -9,6 +10,7 @@ export const MARKET_STEPS = 4;
 
 export function stepKey(g) {
   if (!g) return '';
+  if (g.phase === 'example') return 'example:' + ((g.reveal && g.reveal.idx) || 0);
   if (g.phase === 'decide') return 'decide:' + g.round;
   if (g.phase === 'reveal') return 'reveal:' + g.round + ':' + ((g.reveal && g.reveal.idx) || 0);
   return (g.phase || '') + ':' + (g.round || 0);
@@ -17,6 +19,7 @@ export function stepKey(g) {
 // Seconds for one step from config/rules.js CLOCK, times the host's speed setting (chosen in the lobby). Never under five seconds.
 export const scaled = (secs, scale = 1) => Math.max(5, Math.round(secs * (Number(scale) > 0 ? Number(scale) : 1)));
 export function stepSeconds(C, { phase, season, seasons, idx = 0 }, scale = 1) {
+  if (phase === 'example') return scaled((C.exampleSeconds || [60])[idx] || 60, scale);
   if (phase === 'decide') return scaled(C.decideSeconds[season] || C.decideSeconds[2] || 240, scale);
   if (idx < MARKET_STEPS) return scaled(C.revealSecondsPerMarket, scale);
   return scaled(season >= seasons ? C.finalRecapSeconds : C.recapSeconds, scale);
@@ -25,6 +28,7 @@ export function stepSeconds(C, { phase, season, seasons, idx = 0 }, scale = 1) {
 // The whole game on the clock, step by step, with no early locks. The lobby prints the total so the host can fit the class slot.
 export function gamePlan(C, seasons, scale = 1) {
   const steps = [];
+  for (let i = 0; i < (C.exampleSeconds || []).length; i++) steps.push({ season: 0, step: 'example ' + (i + 1), seconds: stepSeconds(C, { phase: 'example', idx: i }, scale) });
   for (let s = 1; s <= seasons; s++) {
     steps.push({ season: s, step: 'decide', seconds: stepSeconds(C, { phase: 'decide', season: s, seasons }, scale) });
     for (let i = 0; i <= MARKET_STEPS; i++) steps.push({ season: s, step: i < MARKET_STEPS ? 'market ' + (i + 1) : 'recap', seconds: stepSeconds(C, { phase: 'reveal', season: s, seasons, idx: i }, scale) });
