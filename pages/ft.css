@@ -664,3 +664,20 @@ body.page-projector { background: var(--paper); overflow: hidden; }
 /* 10/27: team slots on the join screen */
 .pickl { display: flex; flex-direction: column; gap: 8px; }
 .pickl .btn { margin-top: 0; text-align: left; }
+
+/* 10/27: projector lobby = game code, short link and one tile per team with its four-letter code (Parent Trap pattern) */
+.jl { display: flex; flex-direction: column; gap: 14px; padding: 18px 40px 14px; flex: 1; min-height: 0; }
+.jl-top { display: grid; grid-template-columns: auto 1fr 520px; gap: 40px; align-items: center; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+.jl-code b, .jl-link b { display: block; font-family: var(--mono); font-weight: 700; line-height: 1; }
+.jl-code b { font-size: 104px; letter-spacing: .04em; }
+.jl-link b { font-size: 44px; word-break: break-all; margin-top: 6px; }
+.jl-steps { margin: 0; padding-left: 28px; font-size: 26px; line-height: 1.3; }
+.jl-grid { display: grid; gap: 10px; flex: 1; min-height: 0; grid-auto-rows: 1fr; }
+.jl-tile { background: var(--card); border: 2px solid var(--ink); padding: 8px 12px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; overflow: hidden; }
+.jl-head { display: flex; align-items: center; gap: 10px; min-width: 0; } .jl-head b { font-size: 28px; line-height: 1; }
+.jl-dna { display: flex; flex-wrap: wrap; gap: 3px 4px; font-size: 13px; line-height: 1.5; }
+.jl-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.jl-join { font-family: var(--mono); font-size: 46px; letter-spacing: .08em; line-height: 1; }
+.jl-st { font-size: 20px; font-weight: 600; }
+.jl-tile.taken { opacity: .45; border-style: dashed; } .jl-tile.taken .jl-join { text-decoration: line-through; }
+.jl-tile.house { border-style: dashed; opacity: .7; }

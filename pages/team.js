@@ -3,15 +3,16 @@
 // the season's plan, and a round-0 row that holds the team's brand mark and colour (cosmetic, read by the projector).
 // Layout (10/24 redesign): tabs Studio / Markets / Rival Lookbook, the news as "The Thread", and a dock along the bottom with cash, what the plan
 // holds, what is still open, the clock and the lock button.
-import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat } from './supa.js?v=9c995793';
-import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=9c995793';
-import { clockLeft } from './clock.js?v=9c995793';
-import { exampleScreen } from './example.js?v=9c995793';
-import { validateWith } from '../engine/core.mjs?v=9c995793';
-import { BID_HINT, defaultFallback } from '../config/rules.js?v=9c995793';
+import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat, forgetSeat } from './supa.js?v=97381521';
+import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=97381521';
+import { clockLeft } from './clock.js?v=97381521';
+import { exampleScreen } from './example.js?v=97381521';
+import { BUILD } from './build.js?v=97381521';
+import { validateWith } from '../engine/core.mjs?v=97381521';
+import { BID_HINT, defaultFallback } from '../config/rules.js?v=97381521';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
-  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=9c995793';
-import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=9c995793';
+  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=97381521';
+import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=97381521';
 
 const app = $('#app');
 let planP = null, store, seat = null, game = null, team = null, allTeams = [], view = null, result = null, finalSnap = null, plan = null, why = '', locked = false, notes = [],
@@ -23,8 +24,39 @@ const clone = x => JSON.parse(JSON.stringify(x));
 const htm = (cls, html) => h('span.' + cls, { html });
 
 // ---------- join ----------
+// ---------- game code (10/27): the student link needs no code in it. Type the game code from the projector, then pick a team ----------
+const normGame = v => { v = String(v || '').trim().toUpperCase().replace(/\s+/g, ''); const m = /^(?:WW-?)?([A-Z0-9]{4})$/.exec(v); return m ? 'WW-' + m[1] : v; };
+const NO_GAME = 'No game with that code yet. Ask your instructor for the code shown on the projector, or wait and try again.';
+function gameCodeScreen(msg) {
+  const enter = async code => {
+    const gid = normGame(code), say = t => { const e = $('#gmsg'); if (e) e.textContent = t; };
+    if (!gid) return say('Type the game code shown on the projector.');
+    try {
+      const g = await store.getGame(gid);
+      if (!g) return say(NO_GAME);
+      setParam('g', gid); joinScreen();
+    } catch (e) { say(NO_GAME); }
+  };
+  app.replaceChildren(h('div.join',
+    h('div.wm.join-wm', 'Foreign Threads'),
+    h('p.join-kick', 'MBA 546, week 10. One collection, five cities.'),
+    h('div.join-card',
+      h('label.lbl', { for: 'gcode' }, 'Game code'),
+      h('input#gcode', { autocomplete: 'off', autocapitalize: 'characters', spellcheck: false, placeholder: 'WW-XXXX', onkeydown: ev => { if (ev.key === 'Enter') enter(ev.target.value); } }),
+      h('p.err#gmsg', msg || ''),
+      h('button.btn.primary.wide', { onclick: () => enter($('#gcode').value) }, 'Join'),
+      h('div#gopen'))));
+  // one game made in the last 3 hours, still in its lobby, on this build: offer it as a button. Never a list.
+  store.listGames(20).then(gs => {
+    const now = Date.now(), fresh = (gs || []).filter(g => g.phase === 'lobby' && (g.settings || {}).build === BUILD.id && g.created_at && now - new Date(g.created_at).getTime() < 3 * 3600 * 1000);
+    const box = $('#gopen');
+    if (box && fresh.length === 1) box.append(h('button.btn.wide', { onclick: () => enter(fresh[0].id) }, 'Join the open game ' + fresh[0].id));
+  }).catch(() => {});
+}
+
 function joinScreen(msg, resume) {
   const hint = params().get('g');
+  if (!hint && !resume) return gameCodeScreen(msg);
   const go = async () => {
     try {
       const found = await lookupCode(store, $('#code').value, hint);
@@ -47,16 +79,29 @@ function joinScreen(msg, resume) {
       h('input#nm', { placeholder: 'First name', onkeydown: ev => { if (ev.key === 'Enter') go(); } }),
       msg ? h('p.err', msg) : null,
       h('button.btn.primary.wide', { onclick: go }, 'Join your brand')),
-    hint ? h('div.join-card#pick', h('p.lbl', 'Or pick a team')) : null,
+    hint ? h('div.join-card#pick', h('p.lbl', 'Game ' + hint + '. Tap your team, or type its four-letter code above.'), h('p.err#pickmsg'), h('div.pickl#pickl'),
+      h('button.btn.ghost.sm', { onclick: () => { setParam('g', null); joinScreen(); } }, 'Not this game? Change the game code')) : null,
     resume ? h('div.join-card', h('p', 'You already have this seat on another screen.'), h('button.btn', { onclick: async () => { await takeOverSeat(store, resume.game, resume.seat); seat = (await store.getSeats(resume.game.id)).find(x => x.id === resume.seat.id); start(); } }, 'Take over this seat here')) : null));
-  if (hint) Promise.all([store.getTeams(hint), store.getSeats(hint), store.getGame(hint)]).then(([ts, seats, g]) => {
-    const box = $('#pick'); if (!box || !ts) return;
-    const n = {}; for (const x of seats || []) if (!x.removed) n[x.team_id] = (n[x.team_id] || 0) + 1;
-    const open = ts.filter(t => !t.house);
-    if (!open.length || (g && g.phase !== 'lobby')) { box.remove(); return; }
-    box.append(h('div.pickl', open.map(t => h('button.btn' + (n[t.team_id] ? '' : '.primary'), { onclick: () => { $('#code').value = t.join_code; go(); } },
-      t.name + (n[t.team_id] ? ' (' + n[t.team_id] + ' joined)' : ' (open)')))));
-  }).catch(() => { const b = $('#pick'); if (b) b.remove(); });
+  if (hint) {
+    // teams and who has claimed them, refreshed every 4 s while this screen is up; a game that does not exist yet just waits
+    const fill = async () => {
+      const box = $('#pickl'); if (!box) return;
+      let ts = [], seatsNow = [], g = null;
+      try { [ts, seatsNow, g] = await Promise.all([store.getTeams(hint), store.getSeats(hint), store.getGame(hint)]); } catch (e) { g = null; }
+      const msgEl = $('#pickmsg');
+      if (!g) { if (msgEl) msgEl.textContent = NO_GAME; box.replaceChildren(); }
+      else {
+        if (msgEl) msgEl.textContent = '';
+        const n = {}; for (const x of seatsNow || []) if (!x.removed) n[x.team_id] = (n[x.team_id] || 0) + 1;
+        const open = (ts || []).filter(t => !t.house);
+        if (g.phase !== 'lobby' || !open.length) { box.replaceChildren(); return; }
+        box.replaceChildren(...open.map(t => h('button.btn' + (n[t.team_id] ? '' : '.primary'), { onclick: () => { $('#code').value = t.join_code; go(); } },
+          t.name + ' (' + t.join_code + ')' + (n[t.team_id] ? ' ' + n[t.team_id] + ' joined' : ' open'))));
+      }
+      setTimeout(fill, 4000);
+    };
+    fill();
+  }
 }
 
 // ---------- data ----------
@@ -620,6 +665,7 @@ function lobbyScreen() {
   return [header(false), h('main.tp-main.lobby',
     h('h1.serif-h.page-h', 'Welcome to ' + b.name + '.'),
     h('p.lead', 'Your instructor starts the game. While you wait, set the mark and colour your pieces will carry.'),
+    h('p.note', 'Not you? ', h('button.btn.ghost.sm', { onclick: async () => { try { await store.upsertSeat({ ...seat, removed: true }); } catch (e) { /* the seat is forgotten here either way */ } forgetSeat(game.id); location.href = location.pathname; } }, 'Leave this team')),
     brandEditor(false),
     h('div.dna', h('span.lbl', 'Your brand tiles'), h('p', 'Two tiles are on-brand and free to use. One is off-brand and costs extra. Every other tile adds a small surcharge.'),
       h('div.dna-row', b.free.map(f => h('span.dtile.free', h('span.lbl', ROW_LABEL[f.row]), h('b', tileLabel(f.row, f.tile)), h('span', 'free'))),

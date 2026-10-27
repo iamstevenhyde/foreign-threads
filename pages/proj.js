@@ -2,12 +2,12 @@
 // spread, and one final ranking. 1920 x 1080 stage scaled to the screen. Every step after Start shows its countdown in the masthead (yellow chip)
 // and as a bar along the bottom edge; the admin page moves the game on at zero.
 // Garments are drawn in code (garment.js); each brand's mark and colour come from its round-0 decisions row, each piece's look from the reveal snapshot.
-import { openStore } from './supa.js?v=9c995793';
-import { h, $, $$, params, mmss, friendlyError } from './util.js?v=9c995793';
-import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js?v=9c995793';
-import { cleanStyle, cleanLook } from './garment.js?v=9c995793';
-import { clockLeft } from './clock.js?v=9c995793';
-import { exampleScreen } from './example.js?v=9c995793';
+import { openStore } from './supa.js?v=97381521';
+import { h, $, $$, params, mmss, friendlyError } from './util.js?v=97381521';
+import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js?v=97381521';
+import { cleanStyle, cleanLook } from './garment.js?v=97381521';
+import { clockLeft } from './clock.js?v=97381521';
+import { exampleScreen } from './example.js?v=97381521';
 
 const app = $('#app');
 let store, gid, game = null, pub = null, reveal = null, prevReveal = null, ready = {}, teams = [], seats = [], finalSnap = null, styles = {};
@@ -71,16 +71,24 @@ function paintClock() {
 
 // ---------- screens ----------
 function lobby() {
-  const joinUrl = location.href.replace(/projector\.html.*$/, 'team.html?g=' + gid);
+  // 10/27 (Steven: "the codes need to be on the main screen so they can pick from it"): the game code and the short student link in large type,
+  // then one tile per team with brand, DNA and its four-letter code. A claimed team greys out with a check and its seat count, live.
+  const base = (location.origin + location.pathname).replace(/\/pages\/[^/]*$/, '/').replace(/^https?:\/\//, '').replace(/\/$/, '');
   const count = id => seats.filter(s => s.team_id === id && !s.removed).length;
+  const cols = teams.length > 16 ? 5 : teams.length > 8 ? 4 : teams.length > 4 ? 3 : 2;
   return h('div.pscreen', mast('Game ' + gid, 'MBA 546 · week 10'),
-    h('div.plobby',
-      h('div.pl-left', h('h1.ph1', 'Join the season.'), h('p.pl-how', 'Open the team page and type your four-letter team code.'), h('div.pl-url', joinUrl),
-        h('div.pl-img', pic(lobbySrc()))),
-      h('div.pl-right', h('div.sec-h', h('span.lbl', 'Brands in the room')),
-        h('div.pl-brands' + (teams.length > 10 ? '.many' : ''), teams.map(t => h('div.pbrand' + (t.house ? '.house' : count(t.team_id) ? '.in' : ''),
-          markEl(styleOf(t.team_id), 52), h('div', h('b.wm', t.name), h('span.pb-st', t.house ? 'House brand, plays itself' : count(t.team_id) ? 'Joined' : 'Waiting for a code'),
-            h('div.pb-dna', dnaChips(t.brand_id)))))))));
+    h('div.jl',
+      h('div.jl-top',
+        h('div.jl-code', h('span.lbl', 'Game code'), h('b', gid)),
+        h('div.jl-link', h('span.lbl', 'Open this link on your phone'), h('b', base)),
+        h('ol.jl-steps', h('li', 'Type the game code.'), h('li', 'Tap your team below, or type its four-letter code.'))),
+      h('div.jl-grid', { style: 'grid-template-columns:repeat(' + cols + ',1fr)' }, teams.map(t => { const n = count(t.team_id), taken = !t.house && n > 0;
+        return h('div.jl-tile' + (taken ? '.taken' : '') + (t.house ? '.house' : ''),
+          h('div.jl-head', markEl(styleOf(t.team_id), 40), h('b.wm', t.name)),
+          h('div.jl-dna', dnaChips(t.brand_id)),
+          h('div.jl-foot', t.house ? h('span.jl-st', 'House brand, plays itself') : taken ? h('span.jl-st', '✓ Taken, ' + n + (n > 1 ? ' players' : ' player')) : h('span.jl-st', 'Open'),
+            t.house ? null : h('b.jl-join', t.join_code)));
+      }))));
 }
 
 function decide() {

@@ -1,7 +1,7 @@
 // Seats, roles and the client-side plan checks (spec 01 section 13, spec 05 sections 1.2, 1.3, 1.7).
 // The engine does not enforce roles. This file does, for the screens. The admin page re-validates every lock with the engine.
 
-import { wordCount, fmtM } from './util.js?v=9c995793';
+import { wordCount, fmtM } from './util.js?v=97381521';
 
 export const ROLE_DEFS = {
   ceo: { key: 'ceo', label: 'CEO', perms: ['lock'], hint: 'The CEO writes the why and the predicted value, and presses Lock.' },

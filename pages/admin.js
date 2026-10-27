@@ -1,13 +1,13 @@
 // Admin / host page. Creates a game, shows join codes, runs the clock and the reveal, and runs the engine (host.js).
 // After Start the game runs itself on the clock (host.tick, driven by a worker tick in ticker.js); every button below Start is an optional override.
-import { openStore } from './supa.js?v=9c995793';
-import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=9c995793';
-import { BUILD } from './build.js?v=9c995793';
-import { Host } from './host.js?v=9c995793';
-import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=9c995793';
-import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=9c995793';
-import { clockLeft, gamePlan, stepKey } from './clock.js?v=9c995793';
-import { every } from './ticker.js?v=9c995793';
+import { openStore } from './supa.js?v=97381521';
+import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=97381521';
+import { BUILD } from './build.js?v=97381521';
+import { Host } from './host.js?v=97381521';
+import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=97381521';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=97381521';
+import { clockLeft, gamePlan, stepKey } from './clock.js?v=97381521';
+import { every } from './ticker.js?v=97381521';
 
 const app = $('#app');
 let store, host = null, ready = {}, readyRound = 0, claimed = {}, busy = false, timer = null, unsub = null;
@@ -19,6 +19,7 @@ function attach() {
 const base = () => location.href.split('?')[0].replace(/[^/]*$/, '');
 const teamUrl = () => base() + 'team.html?g=' + host.gid + (pageMode() === 'local' && !/localhost|127\.0\.0\.1/.test(location.hostname) ? '&local=1' : '');
 const projUrl = () => base() + 'projector.html?g=' + host.gid;
+const studentUrl = () => base().replace(/pages\/$/, '');
 
 async function guard(fn) {
   if (busy) return;
@@ -191,6 +192,9 @@ function render() {
   const el = h('div', h('div.bar', h('b', GAME_TITLE + ' ' + g.id), h('span.num', 'Phase: ' + phase + (g.round ? ', season ' + g.round : '')),
       h('span', pageMode() === 'local' ? 'LOCAL mode' : 'LIVE mode')),
     h('div.wrap',
+      h('div.card', h('h2', 'Students: game code and link'),
+        h('div.row', h('b', { style: 'font:700 56px monospace;letter-spacing:3px' }, g.id), h('div', h('div.small.muted', 'Student link (no code needed in it; they type the game code above)'),
+          h('b', { style: 'font:700 22px monospace' }, studentUrl()), ' ', copyBtn(studentUrl(), 'Copy student link')))),
       h('div.card', h('h2', 'Links'),
         h('div.kv', h('span', 'Students (team page)'), h('span', h('a', { href: teamUrl(), target: '_blank' }, teamUrl()), ' ', copyBtn(teamUrl(), 'Copy')),
           h('span', 'Projector'), h('span', h('a', { href: projUrl(), target: '_blank' }, projUrl()), ' ', copyBtn(projUrl(), 'Copy')))),

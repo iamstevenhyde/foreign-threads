@@ -1,8 +1,8 @@
 // The worked-example round, drawn the same way on the projector and the team page (Steven 10/26). Made-up brands, a made-up city, no engine.
 // Three screens: 0 choose, 1 sealed bids (the winning bid is PAID, not held), 2 the reveal (winners only, with percent shares).
-import { h } from './util.js?v=9c995793';
-import { garmentEl, markEl, tileLabel, ROWS, ROW_LABEL } from './ui.js?v=9c995793';
-import { buildExample, EXAMPLE_TEXT, PRACTICE, practiceResult } from '../config/example.js?v=9c995793';
+import { h } from './util.js?v=97381521';
+import { garmentEl, markEl, tileLabel, ROWS, ROW_LABEL } from './ui.js?v=97381521';
+import { buildExample, EXAMPLE_TEXT, PRACTICE, practiceResult } from '../config/example.js?v=97381521';
 
 const EX = buildExample();
 const pc = x => Math.round(x * 100) + '%';
