@@ -96,7 +96,7 @@ test('worked example: the winning bid is paid, the loser is refunded, shares are
 test('the game block is longer: practice round plus a minute on season 1', () => {
   const p = gamePlan(CLOCK, 4, 1);
   assert.equal(p.steps.filter(s => s.season === 0).length, 3);
-  assert.equal(p.total, 2625);
+  assert.equal(p.total, 2325);
 });
 
 test('every page script parses as a module (a stray quote once left the projector on "Loading...")', async () => {

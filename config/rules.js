@@ -93,7 +93,7 @@ export const LATE_PAYMENT_FINAL_HAIRCUT = 0.2;
 export const CLOCK = {
   decideSeconds: { 1: 360, 2: 240, 3: 240, 4: 240 },   // season 1 is a minute longer (10/26): the weights and reveal order are public now and there is more to read
   exampleSeconds: [60, 60, 60],   // the worked-example round before season 1 (Steven 10/26): choose, sealed bids, reveal, on made-up brands (config/example.js)
-  revealSecondsPerMarket: 48,   // one market on the projector (10/27: five markets x 48 s = the old four x 60 s, so the 43:45 game clock holds)
+  revealSecondsPerMarket: 33,   // one market on the projector (10/27: was 48, then cut to 33 at Steven's ask, the reveal ran long; five markets = 2:45 a season, game clock 38:45)
   recapSeconds: 120,            // recap: own results on the team page and carry offers for next season (90 s was judged too short, audit 10/23)
   finalRecapSeconds: 45,        // recap after the last season (no offers), then the final ranking
   allLockedSeconds: 5,          // once every human team has locked, the decision clock drops to this

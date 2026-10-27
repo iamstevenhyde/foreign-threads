@@ -45,10 +45,10 @@ const planLog = (host, id, s) => host.state.tables.ww_log.find(e => e.type === '
 test('clock arithmetic: the configured steps add up to the game length the lobby prints', () => {
   const p = gamePlan(CLOCK, 4, 1);
   assert.equal(p.steps.length, 3 + 4 * (2 + MARKET_IDS.length), '3 practice steps + 4 seasons x (decide + one step per market + recap)');
-  const R5 = MARKET_IDS.length * CLOCK.revealSecondsPerMarket;   // 5 x 48 s = 4 x 60 s (10/27)
+  const R5 = MARKET_IDS.length * CLOCK.revealSecondsPerMarket;   // 5 x 33 s = 2:45 a season (10/27, was 48 s)
   const expect = 180 + (360 + R5 + 120) + 2 * (240 + R5 + 120) + (240 + R5 + 45);
   assert.equal(p.total, expect);
-  assert.equal(p.total, 2625, '43:45 with no early locks: 3:00 practice round, a 6:00 season 1 decide');
+  assert.equal(p.total, 2325, '38:45 with no early locks: 3:00 practice round, a 6:00 season 1 decide');
   assert.equal(gamePlan(CLOCK, 4, 0.5).total, p.steps.reduce((a, x) => a + Math.max(5, Math.round(x.seconds * 0.5)), 0));
   assert.equal(stepSeconds(CLOCK, { phase: 'reveal', season: 4, seasons: 4, idx: MARKET_IDS.length }, 1), CLOCK.finalRecapSeconds);
   assert.equal(stepSeconds(CLOCK, { phase: 'decide', season: 1, seasons: 4 }, 0.01), 5, 'never under five seconds');
