@@ -15,12 +15,12 @@
 //   markets: { market: { mode: ship|partner|own|carried|none, design, price: value|standard|premium, run, bid, fallback: ship|own|none } }
 //   research: [market]        copy: [{id?, from_team, design, season?, market?}]        accept: [{deal_id}]  (a holder accepting a carry offer)
 
-import * as MK from '../config/markets.js?v=97381521';
-import { ROWS, tileLabel, tileIds } from '../config/tiles.js?v=97381521';
-import { BRAND_BY_ID, dnaState } from '../config/brands.js?v=97381521';
-import * as R from '../config/rules.js?v=97381521';
-import { EVENTS, drawDeck, renderEvent } from '../config/events.js?v=97381521';
-import { CLUE_CARDS, clueFor, clueText } from '../config/clues.js?v=97381521';
+import * as MK from '../config/markets.js?v=0b0c6c97';
+import { ROWS, tileLabel, tileIds } from '../config/tiles.js?v=0b0c6c97';
+import { BRAND_BY_ID, dnaState } from '../config/brands.js?v=0b0c6c97';
+import * as R from '../config/rules.js?v=0b0c6c97';
+import { EVENTS, drawDeck, renderEvent } from '../config/events.js?v=0b0c6c97';
+import { CLUE_CARDS, clueFor, clueText } from '../config/clues.js?v=0b0c6c97';
 
 const { MARKET_IDS } = MK;
 const r6 = x => Math.round(x * 1e6) / 1e6;

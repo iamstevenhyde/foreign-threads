@@ -1,13 +1,13 @@
 // Admin / host page. Creates a game, shows join codes, runs the clock and the reveal, and runs the engine (host.js).
 // After Start the game runs itself on the clock (host.tick, driven by a worker tick in ticker.js); every button below Start is an optional override.
-import { openStore } from './supa.js?v=97381521';
-import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=97381521';
-import { BUILD } from './build.js?v=97381521';
-import { Host } from './host.js?v=97381521';
-import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=97381521';
-import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=97381521';
-import { clockLeft, gamePlan, stepKey } from './clock.js?v=97381521';
-import { every } from './ticker.js?v=97381521';
+import { openStore } from './supa.js?v=0b0c6c97';
+import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=0b0c6c97';
+import { BUILD } from './build.js?v=0b0c6c97';
+import { Host } from './host.js?v=0b0c6c97';
+import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=0b0c6c97';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=0b0c6c97';
+import { clockLeft, gamePlan, stepKey } from './clock.js?v=0b0c6c97';
+import { every } from './ticker.js?v=0b0c6c97';
 
 const app = $('#app');
 let store, host = null, ready = {}, readyRound = 0, claimed = {}, busy = false, timer = null, unsub = null;
@@ -20,6 +20,9 @@ const base = () => location.href.split('?')[0].replace(/[^/]*$/, '');
 const teamUrl = () => base() + 'team.html?g=' + host.gid + (pageMode() === 'local' && !/localhost|127\.0\.0\.1/.test(location.hostname) ? '&local=1' : '');
 const projUrl = () => base() + 'projector.html?g=' + host.gid;
 const studentUrl = () => base().replace(/pages\/$/, '');
+const instructorUrl = () => base() + 'admin.html';
+const urlCard = () => h('div.card', h('div.kv', h('span', 'Student link'), h('span', h('b', { style: 'font:700 18px monospace' }, studentUrl()), ' ', copyBtn(studentUrl(), 'Copy')),
+  h('span', 'Instructor page (this one)'), h('span', h('b', { style: 'font:700 18px monospace' }, instructorUrl()), ' ', copyBtn(instructorUrl(), 'Copy'))));
 
 async function guard(fn) {
   if (busy) return;
@@ -63,7 +66,7 @@ function stepBtn(label, key, fn, title) {
 
 function landing() {
   const f = { teams: 20, seed: '', bot: pageMode() === 'local' };
-  const el = h('div.wrap', h('h1', GAME_TITLE + ': host'),
+  const el = h('div.wrap', h('h1', GAME_TITLE + ': host'), urlCard(),
     h('div.card', h('h2', 'New game'),
       h('div.row',
         h('div', h('label', 'Total teams, 4 to ' + BRANDS.length), h('input#f-teams', { type: 'number', min: 4, max: BRANDS.length, value: f.teams, style: 'width:80px' })),
@@ -189,7 +192,7 @@ function render() {
   if (st && st.history && Object.keys(st.history).length) ctrl.push(h('button', { onclick: () => download('foreign-threads-' + g.id + '.json', JSON.stringify(host.exportRun(), null, 1)) }, 'Download game log (JSON)'));
   ctrl.push(h('button.small', { onclick: () => { setParam('g', null); host = null; render(); } }, 'Other games'));
 
-  const el = h('div', h('div.bar', h('b', GAME_TITLE + ' ' + g.id), h('span.num', 'Phase: ' + phase + (g.round ? ', season ' + g.round : '')),
+  const el = h('div', h('div.bar', h('b', GAME_TITLE + ' ' + g.id), h('span.small', 'Instructor: ', instructorUrl(), ' ', copyBtn(instructorUrl(), 'Copy')), h('span.num', 'Phase: ' + phase + (g.round ? ', season ' + g.round : '')),
       h('span', pageMode() === 'local' ? 'LOCAL mode' : 'LIVE mode')),
     h('div.wrap',
       h('div.card', h('h2', 'Students: game code and link'),
@@ -208,6 +211,7 @@ function render() {
 
 (async function main() {
   try {
+    safeSet('ft:host', '1');   // this browser has opened the host page: the student page offers a Go to instructor page banner
     store = await openStore();
     const gid = params().get('g');
     if (gid) { host = new Host(store); try { await host.load(gid); } catch (e) { toast(e.message, 6000); host = null; setParam('g', null); } }

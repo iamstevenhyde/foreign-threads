@@ -3,16 +3,16 @@
 // the season's plan, and a round-0 row that holds the team's brand mark and colour (cosmetic, read by the projector).
 // Layout (10/24 redesign): tabs Studio / Markets / Rival Lookbook, the news as "The Thread", and a dock along the bottom with cash, what the plan
 // holds, what is still open, the clock and the lock button.
-import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat, forgetSeat } from './supa.js?v=97381521';
-import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=97381521';
-import { clockLeft } from './clock.js?v=97381521';
-import { exampleScreen } from './example.js?v=97381521';
-import { BUILD } from './build.js?v=97381521';
-import { validateWith } from '../engine/core.mjs?v=97381521';
-import { BID_HINT, defaultFallback } from '../config/rules.js?v=97381521';
+import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat, forgetSeat } from './supa.js?v=0b0c6c97';
+import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=0b0c6c97';
+import { clockLeft } from './clock.js?v=0b0c6c97';
+import { exampleScreen } from './example.js?v=0b0c6c97';
+import { BUILD } from './build.js?v=0b0c6c97';
+import { validateWith } from '../engine/core.mjs?v=0b0c6c97';
+import { BID_HINT, defaultFallback } from '../config/rules.js?v=0b0c6c97';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
-  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=97381521';
-import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=97381521';
+  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=0b0c6c97';
+import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=0b0c6c97';
 
 const app = $('#app');
 let planP = null, store, seat = null, game = null, team = null, allTeams = [], view = null, result = null, finalSnap = null, plan = null, why = '', locked = false, notes = [],
@@ -27,6 +27,9 @@ const htm = (cls, html) => h('span.' + cls, { html });
 // ---------- game code (10/27): the student link needs no code in it. Type the game code from the projector, then pick a team ----------
 const normGame = v => { v = String(v || '').trim().toUpperCase().replace(/\s+/g, ''); const m = /^(?:WW-?)?([A-Z0-9]{4})$/.exec(v); return m ? 'WW-' + m[1] : v; };
 const NO_GAME = 'No game with that code yet. Ask your instructor for the code shown on the projector, or wait and try again.';
+// A small way to the instructor side from the student page; a device that has opened the host page before gets a visible banner too.
+const hostBanner = () => (safeGet('ft:host') ? h('a.host-banner', { href: 'admin.html' }, 'Go to instructor page') : null);
+const instructorFoot = () => h('p.join-foot', h('a', { href: 'admin.html' }, 'Instructor'));
 function gameCodeScreen(msg) {
   const enter = async code => {
     const gid = normGame(code), say = t => { const e = $('#gmsg'); if (e) e.textContent = t; };
@@ -38,6 +41,7 @@ function gameCodeScreen(msg) {
     } catch (e) { say(NO_GAME); }
   };
   app.replaceChildren(h('div.join',
+    hostBanner(),
     h('div.wm.join-wm', 'Foreign Threads'),
     h('p.join-kick', 'MBA 546, week 10. One collection, five cities.'),
     h('div.join-card',
@@ -45,7 +49,8 @@ function gameCodeScreen(msg) {
       h('input#gcode', { autocomplete: 'off', autocapitalize: 'characters', spellcheck: false, placeholder: 'WW-XXXX', onkeydown: ev => { if (ev.key === 'Enter') enter(ev.target.value); } }),
       h('p.err#gmsg', msg || ''),
       h('button.btn.primary.wide', { onclick: () => enter($('#gcode').value) }, 'Join'),
-      h('div#gopen'))));
+      h('div#gopen')),
+    instructorFoot()));
   // one game made in the last 3 hours, still in its lobby, on this build: offer it as a button. Never a list.
   store.listGames(20).then(gs => {
     const now = Date.now(), fresh = (gs || []).filter(g => g.phase === 'lobby' && (g.settings || {}).build === BUILD.id && g.created_at && now - new Date(g.created_at).getTime() < 3 * 3600 * 1000);
@@ -70,6 +75,7 @@ function joinScreen(msg, resume) {
     } catch (e) { joinScreen(friendlyError(e)); }
   };
   app.replaceChildren(h('div.join',
+    hostBanner(),
     h('div.wm.join-wm', 'Foreign Threads'),
     h('p.join-kick', 'MBA 546, week 10. One collection, five cities.'),
     h('div.join-card',

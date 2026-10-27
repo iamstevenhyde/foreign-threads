@@ -1,12 +1,12 @@
 // node config/validate.mjs : loads every config module and checks the cross-references. Exits 1 on any failure.
-import { MARKETS, MARKET_IDS, startVisible } from './markets.js?v=97381521';
-import { TILES, ROWS, GARMENT_FILES, tileIds } from './tiles.js?v=97381521';
-import { BRANDS, dnaState } from './brands.js?v=97381521';
-import * as R from './rules.js?v=97381521';
-import { CLUE_CARDS, clueText } from './clues.js?v=97381521';
-import { TILE_PHRASE } from './tiles.js?v=97381521';
-import { drawTastes, seededInt, codeFromTastes, tastesFromCode } from './taste.js?v=97381521';
-import { tileLabel } from './tiles.js?v=97381521';
+import { MARKETS, MARKET_IDS, startVisible } from './markets.js?v=0b0c6c97';
+import { TILES, ROWS, GARMENT_FILES, tileIds } from './tiles.js?v=0b0c6c97';
+import { BRANDS, dnaState } from './brands.js?v=0b0c6c97';
+import * as R from './rules.js?v=0b0c6c97';
+import { CLUE_CARDS, clueText } from './clues.js?v=0b0c6c97';
+import { TILE_PHRASE } from './tiles.js?v=0b0c6c97';
+import { drawTastes, seededInt, codeFromTastes, tastesFromCode } from './taste.js?v=0b0c6c97';
+import { tileLabel } from './tiles.js?v=0b0c6c97';
 
 let bad = 0;
 const fail = m => { bad++; console.log('FAIL ' + m); };

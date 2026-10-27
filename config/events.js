@@ -6,7 +6,7 @@
 // op 'grant' on FOG.clueCardReveals (clue cards): shows that taste row (tile and weight tier) to every team, and the teams keep the knowledge.
 // teaches: oli | distance | control | integration | voids.  art: file under art/ or null; needsArt holds a prompt when art is null.
 
-import { TILE_PHRASE } from './tiles.js?v=97381521';
+import { TILE_PHRASE } from './tiles.js?v=0b0c6c97';
 
 // Cards that reveal a taste row to every team carry a `render(tile ids of that market)` that writes the headline, standfirst and body from the
 // room's drawn tile. Their static text is a placeholder that names no tile, so the repo holds no market's taste. Every other card is tile-neutral.

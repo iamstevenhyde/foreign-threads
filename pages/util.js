@@ -1,5 +1,5 @@
 // Small helpers shared by all three pages. No game rules live here.
-import { BUILD } from './build.js?v=97381521';
+import { BUILD } from './build.js?v=0b0c6c97';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];

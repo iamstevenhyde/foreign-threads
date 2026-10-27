@@ -681,3 +681,7 @@ body.page-projector { background: var(--paper); overflow: hidden; }
 .jl-st { font-size: 20px; font-weight: 600; }
 .jl-tile.taken { opacity: .45; border-style: dashed; } .jl-tile.taken .jl-join { text-decoration: line-through; }
 .jl-tile.house { border-style: dashed; opacity: .7; }
+
+/* 10/27: way to the instructor side from the student join page */
+.host-banner { display: block; background: var(--ink); color: var(--paper); text-align: center; padding: 12px; font-weight: 700; margin-bottom: 14px; text-decoration: none; }
+.join-foot { text-align: center; margin-top: 18px; font-size: 12px; opacity: .6; } .join-foot a { color: inherit; }

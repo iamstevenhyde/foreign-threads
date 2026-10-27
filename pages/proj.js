@@ -2,12 +2,12 @@
 // spread, and one final ranking. 1920 x 1080 stage scaled to the screen. Every step after Start shows its countdown in the masthead (yellow chip)
 // and as a bar along the bottom edge; the admin page moves the game on at zero.
 // Garments are drawn in code (garment.js); each brand's mark and colour come from its round-0 decisions row, each piece's look from the reveal snapshot.
-import { openStore } from './supa.js?v=97381521';
-import { h, $, $$, params, mmss, friendlyError } from './util.js?v=97381521';
-import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js?v=97381521';
-import { cleanStyle, cleanLook } from './garment.js?v=97381521';
-import { clockLeft } from './clock.js?v=97381521';
-import { exampleScreen } from './example.js?v=97381521';
+import { openStore } from './supa.js?v=0b0c6c97';
+import { h, $, $$, params, mmss, friendlyError } from './util.js?v=0b0c6c97';
+import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js?v=0b0c6c97';
+import { cleanStyle, cleanLook } from './garment.js?v=0b0c6c97';
+import { clockLeft } from './clock.js?v=0b0c6c97';
+import { exampleScreen } from './example.js?v=0b0c6c97';
 
 const app = $('#app');
 let store, gid, game = null, pub = null, reveal = null, prevReveal = null, ready = {}, teams = [], seats = [], finalSnap = null, styles = {};
