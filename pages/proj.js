@@ -137,7 +137,7 @@ function marketCard(m) {
           h('p.shr-note', 'Only the winning piece is shown. Everyone else\'s design stays private.')))),
     threadBar(evs.filter(e => e.type !== 'bid')));
 }
-// Sealed bids, highest first: the winning bids (PAID) and the best losing bids, at most six lines so the side panel never runs off the screen,
+// Sealed bids, highest first: the winning bids (PAID) and the best losing bids, every winner plus the two best losing bids (10/27: was six lines, which ran off a 20-brand Berlin screen),
 // then one line for the rest (10/27: 20-team rooms can have a dozen bids in one city).
 const seatsOf = M => (M && M.seats && M.seats.length ? M.seats : M && M.seat ? [M.seat] : []);
 const seatNames = M => seatsOf(M).map(nameOf).join(', ');
@@ -146,8 +146,8 @@ function bidLines(bids) {
   const txt = e => e.text.replace(/ for the .* partner seat/, '');
   const amt = e => (typeof e.amount === 'number' ? e.amount : Number((e.text.match(/\$([0-9.]+)M/) || [0, 0])[1]));
   const sorted = bids.slice().sort((a, b) => (b.won === true) - (a.won === true) || amt(b) - amt(a));
-  const MAX = 6, rest = sorted.slice(MAX);
-  return h('div.pm-bids', h('span.lbl', 'Sealed bids (winners pay, losers are refunded)'), sorted.slice(0, MAX).map(e => h('div' + (e.won ? '.won' : ''), txt(e))),
+  const MAX = sorted.filter(e => e.won).length + 2, rest = sorted.slice(MAX);
+  return h('div.pm-bids', h('span.lbl', 'Sealed bids (winners pay)'), sorted.slice(0, MAX).map(e => h('div' + (e.won ? '.won' : ''), txt(e))),
     rest.length ? h('div', 'and ' + rest.length + ' more, the highest $' + amt(rest[0]).toFixed(2) + 'M') : null);
 }
 function threadBar(evs) {

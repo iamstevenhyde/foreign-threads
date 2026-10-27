@@ -632,6 +632,7 @@ body.page-projector { background: var(--paper); overflow: hidden; }
 .shr-bar { height: 28px; }
 .shr.more b { font-size: 24px; color: var(--muted); }
 .pm-bids { font-size: 19px; }
+.pm-img { height: 220px; }
 .pm-bids .won { color: var(--ink); font-weight: 700; }
 /* 10/27: big rooms (up to 20 brands) on the 1920 x 1080 stage */
 .pl-brands.many { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
