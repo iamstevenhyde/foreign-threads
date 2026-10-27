@@ -8,6 +8,7 @@ import { drawTastes, seededInt, codeFromTastes } from '../config/taste.js';
 import { D, line, plan, lock, game, season } from './testkit.mjs';
 import { cleanLook, cleanStyle, garmentSVG, DEFAULT_STYLE } from '../pages/garment.js';
 import { BRANDS } from '../config/brands.js';
+import { MARKET_IDS } from '../config/markets.js';
 
 const mem = new Map();
 globalThis.localStorage = { get length() { return mem.size; }, key: i => [...mem.keys()][i] ?? null, getItem: k => (mem.has(k) ? mem.get(k) : null),
@@ -28,7 +29,7 @@ async function room() {
   return { store, host };
 }
 const withLook = (d, look) => ({ ...d, look });
-async function toRecap(host) { while (!(host.game.phase === 'reveal' && host.game.reveal.idx === 4)) await host.advance(); }
+async function toRecap(host) { while (!(host.game.phase === 'reveal' && host.game.reveal.idx === MARKET_IDS.length)) await host.advance(); }
 
 test('looks: the reveal carries the look of every piece that sold, nothing for unsold pieces, and no tastes', async () => {
   const { store, host } = await room();
@@ -48,7 +49,11 @@ test('looks: the reveal carries the look of every piece that sold, nothing for u
   assert.equal(cleanLook(null, { cut: 'hoodie', palette: 'earth' }).name, 'Earth Hoodie');
   const house = host.state.order.find(id => host.state.teams[id].house);
   assert.equal(rev.looks[house], undefined, 'house plans carry no look; the pages draw a default');
-  for (const m of Object.keys(host.tastes)) assert.ok(!JSON.stringify(rev).includes(JSON.stringify(host.tastes[m])), 'no taste in the reveal');
+  // 10/27: a sold piece may match a city's taste exactly (a house team knows three rows of a distance-1 city and guesses the fourth), so the
+  // check skips the tiles of pieces that sold and looks for the taste anywhere else in the reveal.
+  const noTiles = JSON.stringify(rev, (k, v) => (k === 'tiles' ? undefined : v));
+  for (const m of Object.keys(host.tastes)) assert.ok(!noTiles.includes(JSON.stringify(host.tastes[m])), 'no taste in the reveal: ' + m);
+  assert.ok(!/"(taste|tastes|secret)"/.test(JSON.stringify(rev)), 'no taste key in the reveal');
 });
 
 test('looks: a copy shows the original look and names the brand it copied', async () => {

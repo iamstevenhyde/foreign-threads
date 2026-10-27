@@ -132,22 +132,27 @@ export function fitToCash(view, plan) {
   return plan;
 }
 
+// FNV-1a hash of a string to [0, 1). No game rng is consumed, so adding the spread does not shift any other draw.
+export function hashU(str) { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0) / 4294967296; }
+
 // ---------- house personalities ----------
 export function housePlan(view, personality) {
   const P = HOUSE.personalities[personality], cash = view.cash, specs = [];
   const order = byScore(view);
-  const bidAmt = () => clampBid(view, P.bidShare * cash);
+  // 10/27: house bids vary by team, season and market inside HOUSE.bidSpread (a fixed hash, so a rerun of the same room bids the same)
+  const spread = HOUSE.bidSpread || [1, 1];
+  const bidAmt = (m = '') => { const u = hashU(view.gameId + '|' + view.team.id + '|' + view.season + '|' + m); return clampBid(view, Math.round(P.bidShare * cash * (spread[0] + (spread[1] - spread[0]) * u) * 20) / 20); };
   if (personality === 'steady') {
     const tiles = designFor(view, MARKET_IDS);
     for (const m of MARKET_IDS) {
       const ship = openMode(view, m, 'ship');
-      specs.push({ market: m, tiles, mode: ship ? 'ship' : 'partner', price: P.price, run: P.run, bid: bidAmt(), fallback: P.fallback });
+      specs.push({ market: m, tiles, mode: ship ? 'ship' : 'partner', price: P.price, run: P.run, bid: bidAmt(m), fallback: P.fallback });
     }
   } else if (personality === 'local') {
     order.forEach((m, i) => {
       const tiles = designFor(view, [m]), bids = i < 2;
       const ship = openMode(view, m, 'ship');
-      if (bids) specs.push({ market: m, tiles, mode: 'partner', price: bestPrice(view, m), run: P.run, bid: bidAmt(), fallback: ship ? 'ship' : 'none' });
+      if (bids) specs.push({ market: m, tiles, mode: 'partner', price: bestPrice(view, m), run: P.run, bid: bidAmt(m), fallback: ship ? 'ship' : 'none' });
       else if (ship) specs.push({ market: m, tiles, mode: 'ship', price: bestPrice(view, m), run: P.run, bid: 0, fallback: 'none' });
     });
   } else {
@@ -155,7 +160,7 @@ export function housePlan(view, personality) {
     order.forEach((m, i) => {
       const tiles = designFor(view, [m]), ship = openMode(view, m, 'ship');
       if (m === best) specs.push({ market: m, tiles, mode: P.ownMode, price: bestPrice(view, m), run: P.ownRun, bid: 0, fallback: 'none' });
-      else if (i <= 2 && ship) specs.push({ market: m, tiles, mode: 'partner', price: bestPrice(view, m), run: P.run, bid: bidAmt(), fallback: 'ship' });
+      else if (i <= 2 && ship) specs.push({ market: m, tiles, mode: 'partner', price: bestPrice(view, m), run: P.run, bid: bidAmt(m), fallback: 'ship' });
     });
   }
   const plan = fitToCash(view, assemble(view, specs));

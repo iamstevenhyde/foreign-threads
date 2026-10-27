@@ -52,7 +52,7 @@ export const GARMENT_FILES = CUTS.flatMap(c => PALETTES.map(p => garmentFile(c.i
 
 // Other art named in the 10/21 brief: 4 street scenes, lobby, runway. Filenames are my choice; rename here if the art folder differs.
 export const SCENE_FILES = {
-  street: { berlin: 'wk10_street_berlin.png', tokyo: 'wk10_street_tokyo.png', saopaulo: 'wk10_street_saopaulo.png', nairobi: 'wk10_street_nairobi.png' },
+  street: { berlin: 'wk10_street_berlin.png', tokyo: 'wk10_street_tokyo.png', saopaulo: 'wk10_street_saopaulo.png', nairobi: 'wk10_street_nairobi.png', cdmx: 'wk10_street_cdmx.png' },
   lobby: 'wk10_lobby.png',
   runway: 'wk10_runway.png',
 };

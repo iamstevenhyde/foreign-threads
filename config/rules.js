@@ -31,7 +31,11 @@ export const PRICES = { value: 70, standard: 95, premium: 120 };    // $ per gar
 export const TIER_COST = { value: 0.85, standard: 1.0, premium: 1.6 };
 
 // Buyer pools per market per season (thousands of buyers; one buyer takes one garment). The local incumbent takes its share first by fit.
-export const POOLS = { berlin: 270, tokyo: 335, saopaulo: 250, nairobi: 265 };
+export const POOLS = { berlin: 270, tokyo: 335, saopaulo: 250, nairobi: 265, cdmx: 260 };
+// 10/27 (20-team rooms): pools grow with the room so a team's share stays meaningful. The engine multiplies every pool by poolScale(teams) at game
+// creation (rooms of up to POOL_SCALE.baseTeams teams are unchanged, so the 10/23 balance holds for small rooms).
+export const POOL_SCALE = { baseTeams: 8, perTeam: 1.07 };   // 12 teams x1.5, 16 x2.1, 20 x2.6 (balance/twenty.mjs, 10/27)
+export const poolScale = n => Math.max(1, 1 + POOL_SCALE.perTeam * (n - POOL_SCALE.baseTeams) / POOL_SCALE.baseTeams);
 
 // Share split: each seller's weight = fit ^ fitExponent x market priceFit[tier] x reach(mode). Pool is split by weight, capped by run size.
 // The incumbent is one more seller with its fixed fit and price tier, never a leaderboard row.
@@ -50,12 +54,19 @@ export const MODES = {
 // The foreignness tax table is per market in markets.js. A partner halves it.
 export const PARTNER_TAX_CUT = 0.5;
 
+// 10/27: what the team page suggests for a partner bid, as shares of cash on hand. defaultShare fills the bid box when a team picks Local partner;
+// wonShare is the range printed as "bids that won a seat in test games" (from the 20-team bot run, GAME_SPEC.md section 10). Teaching hint only.
+export const BID_HINT = { defaultShare: 0.05, wonShare: [0.035, 0.07] };   // 300-seed run: winning bids p25 3.5%, median 5.0%, p75 7.0% of cash
+
 // Fog: one more taste row is revealed for each season a team has sold in that market; a partner win reveals one at once;
 // a clue card (static, pre-written) reveals one; research (where the market allows it) reveals one for the fee.
 export const FOG = { perSeasonSold: 1, partnerReveals: 1, clueCardReveals: 1, researchFee: 0.25, researchPerSeason: 1 };
 
 // Partner seat: one per market per season, sealed bid, highest wins, ties broken by seeded draw. The winner reveals one taste row at once.
-export const PARTNER = { seatsPerMarket: 1, revealRows: 1 };
+// 10/27: a big room gets more seats per market (seatsFor). With 20 teams and five markets that is 10 seats a season, so most teams can win one.
+// The top bids win, each winner PAYS its own bid, every losing bid is refunded. The first seat (highest bid) is the one a rival can ask to be carried on.
+export const PARTNER = { seatsPerMarket: 1, revealRows: 1, seatsByTeams: [[10, 1], [16, 2], [99, 2]] };
+export const seatsFor = n => (PARTNER.seatsByTeams.find(([max]) => n <= max) || [0, PARTNER.seatsPerMarket])[1];
 
 // Team-to-team carry (Steven 10/21): the holder of the partner seat in a market may carry one rival's line there.
 // The carried team pays carryFee up front (to the holder) and the holder's partner share applies to the carried revenue too.
@@ -80,7 +91,7 @@ export const LATE_PAYMENT_FINAL_HAIRCUT = 0.2;
 export const CLOCK = {
   decideSeconds: { 1: 360, 2: 240, 3: 240, 4: 240 },   // season 1 is a minute longer (10/26): the weights and reveal order are public now and there is more to read
   exampleSeconds: [60, 60, 60],   // the worked-example round before season 1 (Steven 10/26): choose, sealed bids, reveal, on made-up brands (config/example.js)
-  revealSecondsPerMarket: 60,   // one market on the projector; inside the 90 s cap in GAME_SPEC.md
+  revealSecondsPerMarket: 48,   // one market on the projector (10/27: five markets x 48 s = the old four x 60 s, so the 43:45 game clock holds)
   recapSeconds: 120,            // recap: own results on the team page and carry offers for next season (90 s was judged too short, audit 10/23)
   finalRecapSeconds: 45,        // recap after the last season (no offers), then the final ranking
   allLockedSeconds: 5,          // once every human team has locked, the decision clock drops to this
@@ -104,8 +115,11 @@ export const CLUES = { perTeamPerSeason: 1, fromSeason: 2 };
 //   fallback: what the plan says to do if the partner bid loses.
 export const HOUSE = {
   defaultCount: 2,
-  maxCount: 4,
-  order: ['steady', 'local', 'bold', 'steady'],       // which personality takes house seat 1, 2, 3, 4
+  maxCount: 10,       // 10/27: up to ten so a room of ten human teams can reach twenty
+  order: ['steady', 'local', 'bold', 'steady', 'local', 'bold', 'local', 'steady', 'bold', 'local'],       // which personality takes house seat 1, 2, 3, ...
+  // 10/27: a house bid is bidShare x cash x a factor drawn per team, season and market from bidSpread, so house bids are not one flat number a
+  // human bid has to clear. Visible to students as a range in the bid hint (team page).
+  bidSpread: [0.5, 1.1],
   personalities: {
     steady: { label: 'Steady', blurb: 'One design everywhere, ships where it can, small bids.',
       mode: 'ship', price: 'standard', run: 50, bidShare: 0, fallback: 'none', designs: 'one',

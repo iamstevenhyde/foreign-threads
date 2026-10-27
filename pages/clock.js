@@ -3,10 +3,11 @@
 // that moves the game on; the projector and the team pages only count down from endsAt. A reload of any page reads the same row, so nothing resets.
 //
 // Before season 1 there is a worked-example round: 'example:0'..'example:2' (made-up brands, no engine), then 'decide:1'.
-// Steps of a season: 'decide:S', then 'reveal:S:0'..'reveal:S:3' (one market each), then 'reveal:S:4' (the recap: own results on the team pages and
+// Steps of a season: 'decide:S', then 'reveal:S:0'..'reveal:S:N-1' (one market each), then 'reveal:S:N' (the recap: own results on the team pages and
 // carry offers for next season). The recap of the last season leads to 'final', which has no clock.
 
-export const MARKET_STEPS = 4;
+import { MARKET_IDS } from '../config/markets.js';
+export const MARKET_STEPS = MARKET_IDS.length;   // one reveal step per market (five since 10/27)
 
 export function stepKey(g) {
   if (!g) return '';

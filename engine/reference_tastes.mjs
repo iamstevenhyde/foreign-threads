@@ -6,4 +6,5 @@ export const REFERENCE_TASTES = {
   tokyo: { cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' },
   saopaulo: { cut: 'resort', palette: 'bright', logo: 'allover', fabric: 'light' },
   nairobi: { cut: 'hoodie', palette: 'pastel', logo: 'big', fabric: 'heavy' },
+  cdmx: { cut: 'puffer', palette: 'earth', logo: 'big', fabric: 'performance' },
 };

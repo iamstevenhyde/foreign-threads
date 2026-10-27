@@ -23,7 +23,7 @@
 //   share weight uses effective fit = tolerance + (1 - tolerance) x fit. Low pressure (high tolerance): a global product sells. High pressure: only fit sells.
 // incumbent: the local firm, never on a leaderboard. Its garment is the room's drawn taste exactly, discounted to incumbent.fit.
 
-export const MARKET_IDS = ['berlin', 'tokyo', 'saopaulo', 'nairobi'];
+export const MARKET_IDS = ['berlin', 'tokyo', 'saopaulo', 'nairobi', 'cdmx'];
 
 export const MARKETS = {
   berlin: {
@@ -65,6 +65,19 @@ export const MARKETS = {
     incumbent: { name: 'Mtaani Wear', fit: 0.65, price: 'value' },
     priceFit: { value: 1.4, standard: 0.85, premium: 0.4 },    // fabric and price weigh most
     blurb: 'The void market. No research firm, no court, no formal distributor. Copies spread fast.',
+  },
+  // Added 10/27 for 20-team rooms (Steven: "if it needs another country/market, add one"). GAME DESIGN, like the other four.
+  // The near market: geographic and administrative distance are low (trade pact, no duty), so shipping in reaches buyers well, but courts are slow
+  // (copies are not sued) and buyers are price-minded. Mid pressure for local responsiveness: a global piece half-sells.
+  cdmx: {
+    id: 'cdmx', pressure: 'medium', tolerance: 0.5, shipReachBonus: 0.3, name: 'Mexico City', distance: 1,
+    weights: { cut: 0.20, palette: 0.25, logo: 0.15, fabric: 0.40 },
+    revealOrder: ['fabric', 'palette', 'cut', 'logo'],
+    taxBySeason: [0.10, 0.06, 0.03, 0.01],
+    rules: { research: true, court: true, suitOnCopy: false, streetCopy: false, dutyShipped: 0, paymentLagSeasons: 0, modes: ['ship', 'partner', 'own'], partnerWalks: false },
+    incumbent: { name: 'Telar Sur', fit: 0.65, price: 'value' },
+    priceFit: { value: 1.2, standard: 1.0, premium: 0.7 },
+    blurb: 'The near market. No duty and short freight, so shipping in works; courts are slow, so copies are not sued. Buyers watch price.',
   },
 };
 

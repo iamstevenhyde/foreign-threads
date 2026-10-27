@@ -9,7 +9,7 @@ import { MARKET_IDS } from './markets.js';
 
 const SIZES = ROWS.map(r => TILES[r].length);
 const PER_MARKET = SIZES.reduce((a, b) => a * b, 1);          // 320
-const BASE = 32n, DIGITS = 7;
+const BASE = 32n, DIGITS = Math.ceil(Math.log(PER_MARKET ** MARKET_IDS.length) / Math.log(32) - 1e-9);   // 9 for five markets (was 7 for four)
 const ALPHA = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';              // no I, L, O, U
 
 export const TASTE_SPACE = { markets: MARKET_IDS.length, perMarket: PER_MARKET, codes: BigInt(PER_MARKET) ** BigInt(MARKET_IDS.length) };
@@ -38,7 +38,7 @@ export function codeFromTastes(tastes) {
 
 export function tastesFromCode(code) {
   const s = String(code || '').toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
-  if (s.length !== DIGITS + 1) throw new Error('A restore code has 8 characters, like 4K7Q-X2M9.');
+  if (s.length !== DIGITS + 1) throw new Error('A restore code has ' + (DIGITS + 1) + ' characters, like ' + 'K7QX2M94K7Q'.slice(0, DIGITS + 1).replace(/^(.{4})(.{0,})$/, '$1-$2') + '.');
   const digits = [...s].map(c => ALPHA.indexOf(c));
   if (digits.includes(-1)) throw new Error('That restore code has a character that is not allowed.');
   if (check(digits.slice(0, DIGITS)) !== digits[DIGITS]) throw new Error('That restore code does not check out. Look for a mistyped character.');

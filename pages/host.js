@@ -88,7 +88,7 @@ export class Host {
     const nHouse = this.teams.filter(t => t.house).length, n = this.teams.length;
     if (nHouse >= HOUSE.maxCount) throw new Error('At most ' + HOUSE.maxCount + ' house teams.');
     const pool = this.game.settings.pool;
-    if (n >= pool.length) throw new Error('All twelve brands are in use.');
+    if (n >= pool.length) throw new Error('All ' + pool.length + ' brands are in use.');
     const brand = BRANDS.find(b => b.id === pool[n]);
     const used = new Set(this.teams.map(t => t.join_code));
     let c; do { c = makeCode(4); } while (used.has(c));
@@ -190,12 +190,13 @@ export class Host {
       // Steven 10/26: the reveal shows WINNERS ONLY. Every seller appears with brand, entry mode and share (so the room sees who won by how much), but
       // only the market's winning piece carries its design, tiles and price. Nobody else's design ever leaves the host.
       const isWin = l => res.winners.some(w => w.market === m && w.team === l.team && w.design === l.design);
-      markets[m] = { seat: M.seat || null, crowd: M.crowd, incumbent: { name: st.cfg.MARKETS[m].incumbent.name, share: M.incumbent.share },
+      markets[m] = { seat: M.seat || null, seats: M.seatList || (M.seat ? [M.seat] : []), crowd: M.crowd, incumbent: { name: st.cfg.MARKETS[m].incumbent.name, share: M.incumbent.share },
         lines: M.lines.map(l => (isWin(l) ? { team: l.team, house: l.house, mode: l.mode, win: true, design: l.design, tiles: l.tiles, price: l.price, share: l.share, buyers: l.buyers }
           : { team: l.team, house: l.house, mode: l.mode, win: false, share: l.share, buyers: l.buyers })) };
     }
     const events = st.tables.ww_log.filter(e => e.round === s && (PUBLIC_EVENT_TYPES.has(e.type) || e.type === 'bid' || (e.type === 'carry' && e.payload.phase === 'resolve')))
-      .map(e => ({ type: e.type, market: e.market, text: e.text, team: e.team_id, status: e.payload && e.payload.status }));
+      .map(e => ({ type: e.type, market: e.market, text: e.text, team: e.team_id, status: e.payload && e.payload.status,
+        ...(e.type === 'bid' ? { amount: e.payload.capped_to ?? e.payload.amount, won: !!e.payload.won } : {}) }));
     return { season: s, markets, events, winners: res.winners, roster: this.roster(), looks: this.looksFor(s) };
   }
 
@@ -235,8 +236,8 @@ export class Host {
 
   async setReveal(idx) {
     const s = this.state.season;
-    idx = Math.max(0, Math.min(idx, 4));
-    if (idx >= 4 && this.meta.resultsPublished < s) await this.publishResults();
+    idx = Math.max(0, Math.min(idx, MARKET_IDS.length));
+    if (idx >= MARKET_IDS.length && this.meta.resultsPublished < s) await this.publishResults();
     await this._patch({ reveal: { season: s, idx }, clock: this.clockFor({ phase: 'reveal', round: s, reveal: { idx } }) });
   }
   async publishResults() {
@@ -311,7 +312,7 @@ export class Host {
       const g = this.game;
       if (g.phase === 'example') { const idx = g.reveal ? g.reveal.idx : 0; if (idx < EXAMPLE_STEPS - 1) await this.openExample(idx + 1); else await this.openSeason(); }
       else if (g.phase === 'decide') await this.resolve();
-      else if (g.phase === 'reveal') { const idx = g.reveal ? g.reveal.idx : 0; if (idx < 4) await this.setReveal(idx + 1); else await this.nextSeason(); }
+      else if (g.phase === 'reveal') { const idx = g.reveal ? g.reveal.idx : 0; if (idx < MARKET_IDS.length) await this.setReveal(idx + 1); else await this.nextSeason(); }
       else return false;
       return true;
     } finally { this._advancing = false; }
@@ -370,7 +371,7 @@ export class Host {
     while (this.game.phase !== 'final') {
       if (this.game.phase === 'decide') await this.resolve();
       progress('season ' + this.state.season + ' resolved');
-      await this.setReveal(4);
+      await this.setReveal(MARKET_IDS.length);
       await this.nextSeason();
     }
   }

@@ -3,8 +3,8 @@
 // The card names the tile the room drew for that market: clueText(market, row, tile) fills it in from TILE_PHRASE, so the repo holds no market's tile.
 import { TILE_PHRASE } from './tiles.js';
 
-const CITY = { berlin: 'Berlin', tokyo: 'Tokyo', saopaulo: 'Sao Paulo', nairobi: 'Nairobi' };
-const IDS = { berlin: 'BER', tokyo: 'TOK', saopaulo: 'SAO', nairobi: 'NAI' };
+const CITY = { berlin: 'Berlin', tokyo: 'Tokyo', saopaulo: 'Sao Paulo', nairobi: 'Nairobi', cdmx: 'Mexico City' };
+const IDS = { berlin: 'BER', tokyo: 'TOK', saopaulo: 'SAO', nairobi: 'NAI', cdmx: 'MEX' };
 const ROWID = { cut: 'CUT', palette: 'PAL', logo: 'LOG', fabric: 'FAB' };
 export const CLUE_CARDS = Object.keys(CITY).flatMap(market => Object.keys(ROWID).map(row => ({ id: 'CL-' + IDS[market] + '-' + ROWID[row], market, row, draft: true })));
 

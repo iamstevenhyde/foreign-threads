@@ -83,7 +83,7 @@ export function publicConfig(cfg) {
     markets, RUNS: cfg.RUNS, PRICES: cfg.PRICES, TIER_COST: cfg.TIER_COST, DESIGN: cfg.DESIGN, BUDGET: cfg.BUDGET, MODES: cfg.MODES, SHARE: cfg.SHARE, CARRY: cfg.CARRY,
     COPY: { suitFine: cfg.COPY.suitFine, streetThreshold: cfg.COPY.streetThreshold, streetFitHit: cfg.COPY.streetFitHit },
     FOG: { researchFee: cfg.FOG.researchFee, researchPerSeason: cfg.FOG.researchPerSeason },
-    PARTNER_TAX_CUT: cfg.PARTNER_TAX_CUT,
+    PARTNER_TAX_CUT: cfg.PARTNER_TAX_CUT, PARTNER: { seatsPerMarket: (cfg.PARTNER && cfg.PARTNER.seatsPerMarket) || 1 },
   };
 }
 
@@ -122,6 +122,9 @@ export function createGame({ seed = 1, teams, seasons = R.SEASONS, startCash = R
     state.teams[t.id] = t; state.order.push(t.id);
     state.tables.ww_brands.push({ game_id: state.gameId, team_id: t.id, brand_id: b.id, name: t.name, free_tiles: b.free, costly_tile: b.costly, start_cash: startCash, house: t.house });
   }
+  // 10/27: room size sets the partner seats per market and the pool scale (config/rules.js seatsFor, poolScale). Rooms of up to 12 teams keep 1 seat.
+  state.seatsPerMarket = R.seatsFor(state.order.length);
+  state.poolScale = R.poolScale(state.order.length);
   attachTastes(state, tastes);
   for (const id of state.order) for (const m of MARKET_IDS) {
     const t = state.teams[id];
@@ -157,6 +160,7 @@ export function beginSeason(state) {
   const s = state.season;
   state.cards = state.deck[s];
   state.cfg = seasonConfig(state.cards);
+  scaleRoom(state, state.cfg);
   state.phase = 'open';
   state.offers = state.offers.filter(o => o.applies === s);
   state.cards.forEach((id, i) => {
@@ -180,6 +184,16 @@ export function beginSeason(state) {
   }
   return { season: s, cards: state.cards.map(id => renderEvent(EVENTS.find(e => e.id === id), allTastes(state))) };
 }
+
+// Room-size scaling (10/27). Older saved states without the fields behave as before (1 seat, pools unscaled).
+function scaleRoom(state, cfg) {
+  const k = state.poolScale || 1;
+  if (k !== 1) for (const m of Object.keys(cfg.POOLS)) cfg.POOLS[m] = r6(cfg.POOLS[m] * k);
+  cfg.PARTNER.seatsPerMarket = state.seatsPerMarket || cfg.PARTNER.seatsPerMarket || 1;
+  return cfg;
+}
+// The teams holding a partner seat in market m (one or more), from a season's results or a seats map. seats[m] stays the top bidder for old readers.
+export const seatHolders = (res, m) => (res && res.seatList && res.seatList[m]) || (res && res.seats && res.seats[m] ? [res.seats[m]] : []);
 
 // ---------- fit, designs, costs ----------
 export const designKey = d => ROWS.map(r => d[r]).join('/');
@@ -328,6 +342,7 @@ export function teamView(state, teamId) {
     events: state.cards.map(id => { const e = renderEvent(EVENTS.find(x => x.id === id), allTastes(state)); return { id, headline: e.headline, rule: e.rule }; }),
     publicWinners: clone(state.publicWinners),
     lastSeats: last ? clone(last.seats) : {},
+    lastSeatList: last ? Object.fromEntries(MARKET_IDS.map(m => [m, seatHolders(last, m)])) : {},
     lastCrowd: last ? Object.fromEntries(MARKET_IDS.map(m => [m, last.markets[m].crowd])) : {},
     myOffers: mine.filter(o => o.carried === teamId).map(o => clone(o)),
     offersToMe: mine.filter(o => o.holder === teamId).map(o => clone(o)),
@@ -427,7 +442,8 @@ export function resolveSeason(state, subs = {}) {
   }
 
   // 2. sealed bids: one seat per market, highest capped bid wins, ties by the seeded draw, losers refunded, the winner pays its own bid
-  const seats = {}, bidRows = {};
+  const seats = {}, seatList = {}, bidRows = {};
+  const K = (cfg.PARTNER && cfg.PARTNER.seatsPerMarket) || 1;
   for (const m of MARKET_IDS) {
     const entries = [];
     for (const id of ids) {
@@ -438,15 +454,18 @@ export function resolveSeason(state, subs = {}) {
       entries.push({ id, amount, capped, bit: capped < amount - 1e-9, valid: capped >= cfg.BUDGET.minPartnerBid });
     }
     const live = entries.filter(e => e.valid);
-    let winner = null;
-    if (live.length) {
-      const top = Math.max(...live.map(e => e.capped));
-      const tied = live.filter(e => Math.abs(e.capped - top) < 1e-9);
-      winner = tied.length > 1 ? pick(state, tied).id : tied[0].id;
+    // the K highest capped bids win (K = seats per market for this room); ties at the cut are broken by the seeded draw
+    const won = [];
+    let rest = live.slice();
+    while (won.length < K && rest.length) {
+      const top = Math.max(...rest.map(e => e.capped));
+      const tied = rest.filter(e => Math.abs(e.capped - top) < 1e-9);
+      const w = tied.length > 1 ? pick(state, tied) : tied[0];
+      won.push(w.id); rest = rest.filter(e => e !== w);
     }
-    seats[m] = winner;
+    seats[m] = won[0] || null; seatList[m] = won;
     for (const e of entries) {
-      const won = e.id === winner;
+      const won = seatList[m].includes(e.id);
       state.tables.ww_bids.push({ game_id: gid, season: s, market: m, team_id: e.id, amount: e.amount, capped_to: e.bit ? e.capped : null, won });
       log(state, { team: e.id, market: m, type: 'bid', text: name(state, e.id) + ' bid $' + e.capped.toFixed(2) + 'M for the ' + MK.MARKETS[m].name + ' partner seat' + (won ? ' and won it' : ' and lost'),
         payload: { amount: e.amount, capped_to: e.bit ? e.capped : null, won, refunded: won ? 0 : e.capped, valid: e.valid } });
@@ -463,7 +482,7 @@ export function resolveSeason(state, subs = {}) {
     let status = 'declined', reason = accepted ? '' : 'the holder did not accept';
     if (accepted) {
       const cd = line && line.mode === 'carried' ? cp.designs.find(d => d.id === line.design) : null;
-      if (seats[o.market] !== o.holder) { status = 'void'; reason = 'the holder did not win the seat'; }
+      if (!seatList[o.market].includes(o.holder)) { status = 'void'; reason = 'the holder did not win the seat'; }
       else if (!cd || ROWS.some(r => cd[r] !== o.design[r])) { status = 'void'; reason = 'the carried team did not play the offered design'; }
       else if (oneHolder.has(o.holder + o.market)) { status = 'declined'; reason = 'one carry per holder per market per season'; }
       else { status = 'accepted'; oneHolder.add(o.holder + o.market); }
@@ -516,7 +535,7 @@ export function resolveSeason(state, subs = {}) {
       let mode = req.mode, fell = false, note = '';
       const des = dz.map[req.design];
       if (!des) { mode = 'none'; note = 'design missing'; }
-      else if (mode === 'partner' && seats[m] !== id) { fell = true; mode = req.fallback || 'none'; note = 'lost the partner seat'; }
+      else if (mode === 'partner' && !seatList[m].includes(id)) { fell = true; mode = req.fallback || 'none'; note = 'lost the partner seat'; }
       else if (mode === 'carried' && !dealFor(id, m)) { fell = true; mode = req.fallback || 'none'; note = 'no carry deal'; }
       if (mode !== 'none' && ['ship', 'partner', 'own'].includes(mode) && !pm.rules.modes.includes(mode)) { mode = 'none'; note = 'mode not open'; }
       if (mode === 'none') { finals[id].notes.push(m + ': ' + (note || 'sat out')); continue; }
@@ -632,7 +651,7 @@ export function resolveSeason(state, subs = {}) {
     for (const m of MARKET_IDS) {
       const l = my[m], sc = (suit[id] && suit[id][m]) || { paid: 0, received: 0 };
       const bidE = bidRows[m][id];
-      const seatPaid = seats[m] === id ? r6(bidE.capped) : 0;
+      const seatPaid = seatList[m].includes(id) ? r6(bidE.capped) : 0;
       const resFee = (research[id] || []).includes(m) ? cfg.FOG.researchFee : 0;
       const hi = (holderIncome[id] && holderIncome[id][m]) || { fee: 0, share: 0 };
       const partnerIncome = r6(hi.fee + hi.share);
@@ -692,7 +711,7 @@ export function resolveSeason(state, subs = {}) {
   for (const id of ids) {
     const t = T[id], p = finals[id].plan;
     for (const m of MARKET_IDS) if (lines[m].some(l => l.team === id)) { t.active[m]++; revealRow(state, t, m, null, 'season', { season_sold: t.active[m] }); }
-    for (const m of MARKET_IDS) if (seats[m] === id) revealRow(state, t, m, null, 'partner');
+    for (const m of MARKET_IDS) if (seatList[m].includes(id)) revealRow(state, t, m, null, 'partner');
     for (const m of (research[id] || [])) {
       revealRow(state, t, m, null, 'research');
       log(state, { team: id, market: m, type: 'fog', text: name(state, id) + ' bought research in ' + MK.MARKETS[m].name, payload: { purchase: true, fee: cfg.FOG.researchFee, source: 'research' } });
@@ -722,7 +741,7 @@ export function resolveSeason(state, subs = {}) {
   }
   for (const r of seasonRows) state.tables.ww_seasons.push(r);
 
-  const res = buildResults(state, { s, lines, mk, seats, seasonRows, designs, designFees, teamTax, cashStart, finals, writeOff, winnersThisSeason });
+  const res = buildResults(state, { s, lines, mk, seats, seatList, seasonRows, designs, designFees, teamTax, cashStart, finals, writeOff, winnersThisSeason });
   state.history[s] = res;
   state.seats[s] = seats;
   state.phase = 'resolved';
@@ -735,10 +754,10 @@ export function resolveSeason(state, subs = {}) {
 }
 
 function buildResults(state, c) {
-  const { s, lines, mk, seats, seasonRows, designs, designFees, teamTax, cashStart, finals, writeOff, winnersThisSeason } = c;
+  const { s, lines, mk, seats, seatList, seasonRows, designs, designFees, teamTax, cashStart, finals, writeOff, winnersThisSeason } = c;
   const markets = {};
   for (const m of MARKET_IDS) {
-    markets[m] = { ...mk[m], seat: seats[m] || null,
+    markets[m] = { ...mk[m], seat: seats[m] || null, seatList: seatList[m] || [],
       lines: lines[m].map(l => {
         const row = seasonRows.find(r => r.team_id === l.team && r.market === m);
         return { team: l.team, house: state.teams[l.team].house, mode: l.mode, requested: l.requested, design: l.design, tiles: l.tiles, price: l.price, run: l.run, fit: l.fit,
@@ -755,7 +774,7 @@ function buildResults(state, c) {
       taxPaid: r6(teamTax[id]), taxByMarket: Object.fromEntries(rows.map(r => [r.market, r.tax_paid])), stood: finals[id].stood, ...(finals[id].savedRan ? { savedRan: true } : {}), receivables: r6(t.receivables.reduce((a, x) => a + x.amount, 0)),
       writeOff: writeOff[id] || 0 };
   }
-  return { season: s, cards: state.cards, seats, markets, teams, winners: winnersThisSeason };
+  return { season: s, cards: state.cards, seats, seatList, markets, teams, winners: winnersThisSeason };
 }
 
 // Profit so far = cash + money still owed - start cash. The final season also applies the haircut on unpaid receivables (done in resolveSeason).

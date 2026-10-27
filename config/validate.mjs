@@ -27,7 +27,8 @@ ok(MARKETS.nairobi.rules.research === false && MARKETS.nairobi.rules.court === f
 ok(MARKETS.saopaulo.rules.dutyShipped > 0 && MARKETS.saopaulo.rules.paymentLagSeasons > 0, 'Sao Paulo has duty and late payment');
 ok(MARKETS.berlin.rules.suitOnCopy && MARKETS.tokyo.rules.suitOnCopy, 'Berlin and Tokyo sue on copying');
 
-ok(BRANDS.length === 12, 'twelve brands');
+ok(BRANDS.length >= 20 && new Set(BRANDS.map(b => b.id)).size === BRANDS.length, 'at least twenty distinct brands (20-team rooms, 10/27)');
+ok(R.seatsFor(8) === 1 && R.seatsFor(10) === 1 && R.seatsFor(12) === 2 && R.seatsFor(20) === 2, 'partner seats per market scale with the room');
 for (const b of BRANDS) {
   ok(b.free.length === 2 && b.costly, b.id + ' has two free tiles and one costly tile');
   for (const x of [...b.free, b.costly]) ok(tileIds(x.row).includes(x.tile), b.id + ' tile exists: ' + x.row + '/' + x.tile);

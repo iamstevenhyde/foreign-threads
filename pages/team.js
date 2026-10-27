@@ -8,6 +8,7 @@ import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeG
 import { clockLeft } from './clock.js';
 import { exampleScreen } from './example.js';
 import { validateWith } from '../engine/core.mjs';
+import { BID_HINT } from '../config/rules.js';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
   MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js';
 import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js';
@@ -38,7 +39,7 @@ function joinScreen(msg, resume) {
   };
   app.replaceChildren(h('div.join',
     h('div.wm.join-wm', 'Foreign Threads'),
-    h('p.join-kick', 'MBA 546, week 10. One collection, four cities.'),
+    h('p.join-kick', 'MBA 546, week 10. One collection, five cities.'),
     h('div.join-card',
       h('label.lbl', { for: 'code' }, 'Team code'),
       h('input#code', { maxlength: 4, autocomplete: 'off', autocapitalize: 'characters', spellcheck: false, placeholder: 'ABCD', onkeydown: ev => { if (ev.key === 'Enter') go(); } }),
@@ -165,7 +166,7 @@ function clockLabel() {
   if (game.phase === 'decide') return c.early ? 'All locked' : 'Lock in';
   if (game.phase === 'example') return 'Practice ends in';
   const idx = (game.reveal && game.reveal.idx) || 0;
-  return idx < 3 ? 'Next market' : idx === 3 ? 'Results in' : game.round >= ((game.settings && game.settings.seasons) || 4) ? 'Final in' : 'Next season';
+  return idx < MARKET_IDS.length - 1 ? 'Next market' : idx === MARKET_IDS.length - 1 ? 'Results in' : game.round >= ((game.settings && game.settings.seasons) || 4) ? 'Final in' : 'Next season';
 }
 const timerChip = (cls = '') => game.clock && (game.phase === 'decide' || game.phase === 'reveal' || game.phase === 'example') ? h('span.timer' + cls, h('span.tl.js-tlabel', clockLabel()), h('b.js-tclock', mmss(clockLeft(game.clock, Date.now())))) : null;
 function brandLockup(big) {
@@ -194,7 +195,7 @@ function openItems(v) {
   const und = MARKET_IDS.filter(m => !plan.markets[m]);
   const out = [];
   if (!plan.designs.length && !plan.copy.length) out.push('Add at least one design');
-  if (und.length) out.push((und.length === 4 ? 'All four markets' : und.map(m => MARKETS[m].name).join(', ')) + ' not decided');
+  if (und.length) out.push((und.length === MARKET_IDS.length ? 'All ' + MARKET_IDS.length + ' markets' : und.map(m => MARKETS[m].name).join(', ')) + ' not decided');
   const entered = MARKET_IDS.filter(m => plan.markets[m] && plan.markets[m].mode && plan.markets[m].mode !== 'none');
   if (!und.length && !entered.length) out.push('You are not selling anywhere');
   if (v.errors.length) out.unshift(v.errors[0]);
@@ -349,7 +350,7 @@ function marketStrip() {
     const status = !line ? 'Not decided' : !line.mode || line.mode === 'none' ? (Number(line.bid) > 0 ? 'Bidding only' : 'Staying out') : MODE_LABEL[line.mode] + ' · ' + line.design;
     return h('button.mcard' + (selM === m ? '.on' : '') + (!line ? '.und' : ''), { onclick: () => { selM = m; safeSet('ft:market', m); render(); } },
       thumb(m),
-      h('div.mc-txt', h('span.wm.mc-name', pm.name), h('span.lbl', pm.pool + 'K buyers'), h('span.mc-st', status), h('span.mc-k', known + ' of 4 tastes known')));
+      h('div.mc-txt', h('span.wm.mc-name', pm.name), h('span.lbl', Math.round(pm.pool) + 'K buyers'), h('span.mc-st', status), h('span.mc-k', known + ' of 4 tastes known')));
   }));
 }
 const thumbs = new Map();   // one <img> per city thumbnail, reused across redraws
@@ -375,9 +376,18 @@ function tasteCard(m, row) {
     k ? h('span.tier.' + k.tier.toLowerCase(), k.tier + ' weight · ' + wPct(m, row)) : h('span.tier.none', 'Weight ' + wPct(m, row) + ' · revealed ' + ordinal(view.pub.markets[m].revealOrder.indexOf(row) + 1)),
     h('span.src', k ? SOURCE[k.source] || k.source : 'Sell here, win the partner seat, draw a clue' + (view.pub.markets[m].rules.research ? ' or buy research' : '')));
 }
+// 10/27: partner seats per market (2 in a big room) and the bid suggestion, both from the public config.
+const seatsN = () => (view.pub.PARTNER && view.pub.PARTNER.seatsPerMarket) || 1;
+const seatWords = () => (seatsN() > 1 ? 'The ' + seatsN() + ' highest bids each take a seat.' : 'The highest bid takes the one seat.');
+const r10 = x => Math.round(x * 10) / 10;
+function defaultBid() { return Math.max(view.pub.BUDGET.minPartnerBid, Math.min(r10(view.bidCap), r10(BID_HINT.defaultShare * view.cash))); }
+function bidHint() {
+  const [a, b] = BID_HINT.wonShare;
+  return 'In test games, bids that won a seat were mostly ' + money1(Math.min(view.bidCap, a * view.cash)) + ' to ' + money1(Math.min(view.bidCap, b * view.cash)) + ' at your cash. A bid at the minimum rarely wins.';
+}
 function costsList(m) {
   const pm = view.pub.markets[m], R = pm.rules, taxIdx = Math.min(view.active[m] || 0, pm.taxBySeason.length - 1), tax = pm.taxBySeason[taxIdx];
-  const lastHolder = view.lastSeats[m];
+  const lastHolders = (view.lastSeatList && view.lastSeatList[m]) || (view.lastSeats[m] ? [view.lastSeats[m]] : []), lastHolder = lastHolders.length ? lastHolders.map(brandName).join(', ') : null;
   const row = (k, v, cls = '') => [h('span' + cls, k), h('b' + cls, v)];
   return h('div.kv2.costs-list',
     row('Foreignness tax', Math.round(tax * 100) + '% of unit cost this season (' + Math.round(tax * view.pub.PARTNER_TAX_CUT * 100) + '% with a partner). It falls each season you sell here.'),
@@ -390,7 +400,7 @@ function costsList(m) {
     row('What buyers weigh', ROWS.slice().sort((a, b) => pm.weights[b] - pm.weights[a]).map(r => ROW_LABEL[r] + ' ' + Math.round(pm.weights[r] * 100) + '%').join(' · ') + ' (public)'),
     row('Order rows come to light', pm.revealOrder.map(r => ROW_LABEL[r]).join(', ') + '. The first ' + pm.startVisible + ' show from the start.'),
     row('Local rival', pm.incumbent.name + ' sells a near-perfect local fit at ' + pm.incumbent.price + ' price'),
-    row('Last season', lastHolder ? brandName(lastHolder) + ' held the partner seat; ' + (view.lastCrowd[m] || 0) + ' sellers' : view.season > 1 ? 'Nobody held the partner seat; ' + (view.lastCrowd[m] || 0) + ' sellers' : 'No history yet'));
+    row('Last season', lastHolder ? lastHolder + (lastHolders.length > 1 ? ' held the partner seats; ' : ' held the partner seat; ') + (view.lastCrowd[m] || 0) + ' sellers' : view.season > 1 ? 'Nobody held the partner seat; ' + (view.lastCrowd[m] || 0) + ' sellers' : 'No history yet'));
 }
 function modeCards(m) {
   const pm = view.pub.markets[m], line = plan.markets[m] || null, cur = line ? line.mode || 'none' : null;
@@ -406,13 +416,13 @@ function modeCards(m) {
       set({ mode, design: own.id }); return;
     }
     const patch = { mode };
-    if (mode === 'partner' && !(Number((plan.markets[m] || {}).bid) > 0)) patch.bid = Math.max(view.pub.BUDGET.minPartnerBid, Math.round(Math.min(view.bidCap, view.pub.BUDGET.minPartnerBid * 2) * 10) / 10);
+    if (mode === 'partner' && !(Number((plan.markets[m] || {}).bid) > 0)) patch.bid = defaultBid();   // 10/27: was twice the minimum (0.4), which never beat a house bid
     set(patch);
   };
   const cards = [
     { k: 'none', t: 'Stay out', c: '$0 committed', d: 'Keep focus elsewhere. You learn nothing new here this season.' },
     { k: 'ship', t: 'Ship in', c: 'Tax ' + tax + '%' + (pm.rules.dutyShipped ? ' · duty ' + Math.round(pm.rules.dutyShipped * 100) + '%' : ' · no duty'), d: 'Reaches ' + ship + '% as many buyers as a partner. You keep every sale.', off: !pm.rules.modes.includes('ship') && 'No formal distributor here, so nothing can be shipped in.' },
-    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. The highest bid takes the one seat and is PAID (spent, not held); losers are refunded and their fallback runs.' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
+    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. ' + seatWords() + ' Each winning bid is PAID (spent, not held); losers are refunded and their fallback runs.' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
     { k: 'own', t: 'Own shop', c: (view.owned[m] ? 'Set-up already paid' : 'Set-up ' + money(view.pub.MODES.own.setup)) + ' · tax ' + tax + '%', d: 'Reaches ' + own + '% of a partner, only ' + ramp + '% in your first season here. Paid at once, no partner share.' },
   ];
   if (offer) cards.push({ k: 'carried', t: 'Carried by ' + brandName(offer.holder), c: 'Fee ' + money(view.pub.CARRY.fee) + ' · tax ' + taxP + '%', d: 'Rides on their partner seat if they win it again. They see your design.' });
@@ -441,7 +451,8 @@ function bidBox(m) {
   const set = v => { v = Math.max(0, Math.round(v * 10) / 10); plan.markets[m] = { mode: 'none', design: designIds()[0] || '', price: 'standard', run: 50, fallback: 'none', ...plan.markets[m], bid: v }; changed(); };
   return h('div.bid' + (need ? '.need' : ''),
     h('div', h('span.lbl', need ? 'Sealed bid for the partner seat' : 'Bid for the seat anyway (optional)'),
-      h('p.note', 'Max ' + money(view.bidCap) + ' (' + Math.round(view.pub.BUDGET.partnerBidCap * 100) + '% of cash), at least ' + money(view.pub.BUDGET.minPartnerBid) + '. Highest bid wins and the winning bid is PAID (spent, not held). A losing bid is refunded.')),
+      h('p.note', 'Max ' + money(view.bidCap) + ' (' + Math.round(view.pub.BUDGET.partnerBidCap * 100) + '% of cash), at least ' + money(view.pub.BUDGET.minPartnerBid) + '. ' + seatWords() + ' A winning bid is PAID (spent, not held). A losing bid is refunded.'),
+      h('p.note.hint', bidHint())),
     h('div.stepper', h('button.btn.sq', { 'aria-label': 'Lower bid', onclick: () => set(bid - 0.1) }, '−'),
       h('input', { type: 'number', min: 0, step: 0.1, value: bid.toFixed(1), 'aria-label': 'Bid in $M', onchange: ev => set(Number(ev.target.value) || 0) }),
       h('button.btn.sq', { 'aria-label': 'Raise bid', onclick: () => set(bid + 0.1) }, '+')));
@@ -457,11 +468,11 @@ function offersTo(m) {
 function markets() {
   const m = MARKETS[selM] ? selM : 'berlin', pm = view.pub.markets[m];
   const v = check(), cost = v.cost.by[m];
-  const pressure = pm.pressure === 'high' ? 'Only a good fit sells here.' : 'A global product still sells here.';
+  const pressure = pm.pressure === 'high' ? 'Only a good fit sells here.' : pm.pressure === 'medium' ? 'A global product half sells here; a fit sells better.' : 'A global product still sells here.';
   return h('div.mkts', marketStrip(),
     h('div.brief',
       h('div.brief-l',
-        h('div.brief-head', h('h2.serif-h', pm.name), h('p.lead', pm.blurb), h('p.press' + (pm.pressure === 'high' ? '.hi' : ''), h('span.lbl', 'Pressure to localize'), ' ' + (pm.pressure === 'high' ? 'High. ' : 'Low. ') + pressure)),
+        h('div.brief-head', h('h2.serif-h', pm.name), h('p.lead', pm.blurb), h('p.press' + (pm.pressure === 'high' ? '.hi' : ''), h('span.lbl', 'Pressure to localize'), ' ' + (pm.pressure === 'high' ? 'High. ' : pm.pressure === 'medium' ? 'Medium. ' : 'Low. ') + pressure)),
         h('div.sec-h', h('span.lbl', 'What buyers want'), h('span.note', 'Weights are public; a tile shows once you have learned it')),
         h('div.tastes', ROWS.map(r => tasteCard(m, r))),
         h('div.sec-h', h('span.lbl', 'Costs and barriers')),
@@ -585,7 +596,7 @@ function carryPanel() {
         await store.patchDecision(game.id, seat.team_id, result.season, { notes }); toast('Offer saved'); render(); } }, 'Make offer')));
 }
 function revealWait() {
-  const idx = Math.min((game.reveal || { idx: 0 }).idx, 3), m = MARKET_IDS[idx], line = plan && plan.markets[m];
+  const idx = Math.min((game.reveal || { idx: 0 }).idx, MARKET_IDS.length - 1), m = MARKET_IDS[idx], line = plan && plan.markets[m];
   const p = line && line.mode && line.mode !== 'none' ? pieceById(line.design) : null;
   return h('div.rwait', h('span.lbl', 'Season ' + game.round + ' is out'), h('h1.serif-h', 'Now on the projector: ' + MARKETS[m].name + '.'),
     p ? h('div.rw-piece', gEl(p, { cls: 'gsvg lg' }), h('div', h('span.lbl', 'Your entry here'), h('b.rw-name', cleanLook(p.look, p.tiles).name), h('p', MODE_LABEL[line.mode] + ' · ' + PRICE_LABEL[line.price] + ' · ' + line.run + 'k made')))
@@ -618,6 +629,13 @@ function finalScreen() {
     result ? resultScreen() : null);
 }
 
+// ---------- practice bid (10/27): kept on this phone only, never written to the store ----------
+const practiceKey = () => 'ft:practice:' + (game ? game.id : '') + ':' + (seat ? seat.id : '');
+function practiceCtx() {
+  const v = Number(safeGet(practiceKey()));
+  return { teamCount: game.team_count || (allTeams || []).length || 8, bid: v > 0 ? v : null, setBid: x => { safeSet(practiceKey(), String(x)); render(); } };
+}
+
 // ---------- clock paint, render ----------
 function paintClock() {
   if (!game || !game.clock) return;
@@ -634,7 +652,7 @@ function render() {
   if (ae && (ae.tagName === 'TEXTAREA' || (ae.tagName === 'INPUT' && /text|number|search/.test(ae.type))) && app.contains(ae)) return;
   let body;
   if (game.phase === 'lobby') body = lobbyScreen();
-  else if (game.phase === 'example') body = [header(false), h('main.tp-main', exampleScreen((game.reveal && game.reveal.idx) || 0, 'team'))];
+  else if (game.phase === 'example') body = [header(false), h('main.tp-main', exampleScreen((game.reveal && game.reveal.idx) || 0, 'team', practiceCtx()))];
   else if (!view) body = [header(false), h('main.tp-main', h('p', 'Loading your season...'))];
   else if (game.phase === 'final') body = [header(false), finalScreen()];
   else if (game.phase === 'decide') body = plan ? decideScreen() : [header(false), h('main.tp-main', 'Loading...')];

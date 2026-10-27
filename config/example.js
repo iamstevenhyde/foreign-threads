@@ -49,9 +49,41 @@ export const EXAMPLE_TEXT = [
       'Both brands here want the local-partner seat, so each writes a sealed bid. Alder also names a fallback: ship in if the bid loses.',
       'Every city has public weights, shown here. What a city likes inside each row stays hidden until you learn it.'] },
   { kicker: 'Practice round, step 2 of 3', head: 'The sealed bids.', lines: [
-      'The highest bid takes the seat. The winning bid is PAID. It is spent, not held, and it does not come back.',
+      'The highest bid takes the seat (in a room of more than ten teams each city has two seats, and the two highest bids win). The winning bid is PAID. It is spent, not held, and it does not come back.',
       'A losing bid is returned in full, and the loser plays its fallback.'] },
   { kicker: 'Practice round, step 3 of 3', head: 'The reveal.', lines: [
       'The projector shows who won each city and by how much. Only the winning piece is shown, so everyone else\'s design stays private.',
       'A winning piece can be copied next season, so winning in public has a price.'] },
 ];
+
+// ---------- the practice bid (10/27): every student enters a bid on their phone and sees whether it won ----------
+// Made-up rival bids for one Example City partner seat (or two in a big room, the same rule as the real game: rules.js seatsFor). The student
+// plays a made-up brand with the real game's starting cash, so the cap and the minimum are the real ones. Nothing is written to the store and
+// nothing counts; a student who joins late or never types a bid plays the default.
+import { BUDGET, BID_HINT, seatsFor } from './rules.js';
+
+export const PRACTICE = {
+  brand: 'Your practice brand',
+  cash: BUDGET.startCash,
+  rivals: [{ name: 'Birch', bid: 1.1 }, { name: 'Alder', bid: 0.75 }, { name: 'Cedar', bid: 0.45 }],
+  defaultBid: Math.round(BID_HINT.defaultShare * BUDGET.startCash * 10) / 10,
+};
+export const practiceCap = () => Math.round(BUDGET.partnerBidCap * PRACTICE.cash * 100) / 100;
+
+// The outcome of one practice bid. seats: partner seats per market for this room (seatsFor(team count)). A tie with a rival loses (the real
+// game breaks ties with a seeded draw; the practice says so).
+export function practiceResult(bidIn, teamCount) {
+  const seats = seatsFor(teamCount || 8), cap = practiceCap(), min = BUDGET.minPartnerBid;
+  const typed = Number(bidIn);
+  const entered = Number.isFinite(typed) && typed > 0;
+  const amount = entered ? typed : PRACTICE.defaultBid;
+  const capped = Math.min(amount, cap), valid = capped >= min - 1e-9;
+  const all = [...PRACTICE.rivals.map(r => ({ ...r, me: false })), { name: 'You', bid: capped, me: true }]
+    .sort((a, b) => b.bid - a.bid || (a.me ? 1 : 0) - (b.me ? 1 : 0));
+  const live = all.filter(x => !x.me || valid);
+  const winners = live.slice(0, seats);
+  const won = valid && winners.some(x => x.me);
+  const cut = PRACTICE.rivals.map(r => r.bid).sort((a, b) => b - a)[seats - 1];   // the rival bid a student had to beat
+  return { seats, cap, min, amount, capped, wasCapped: capped < amount - 1e-9, valid, entered, won, paid: won ? capped : 0, refunded: won ? 0 : (valid ? capped : 0),
+    toBeat: cut, ranking: all.map(x => ({ ...x, won: winners.includes(x) })) };
+}

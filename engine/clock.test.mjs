@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CLOCK } from '../config/rules.js';
+import { MARKET_IDS } from '../config/markets.js';
 import { drawTastes, seededInt, codeFromTastes } from '../config/taste.js';
 import { stepKey, stepSeconds, gamePlan, clockLeft, isDue, newClock, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from '../pages/clock.js';
 import { every } from '../pages/ticker.js';
@@ -43,12 +44,13 @@ const planLog = (host, id, s) => host.state.tables.ww_log.find(e => e.type === '
 
 test('clock arithmetic: the configured steps add up to the game length the lobby prints', () => {
   const p = gamePlan(CLOCK, 4, 1);
-  assert.equal(p.steps.length, 27, '3 practice steps + 4 seasons x (decide + 4 markets + recap)');
-  const expect = 180 + (360 + 4 * 60 + 120) + 2 * (240 + 4 * 60 + 120) + (240 + 4 * 60 + 45);
+  assert.equal(p.steps.length, 3 + 4 * (2 + MARKET_IDS.length), '3 practice steps + 4 seasons x (decide + one step per market + recap)');
+  const R5 = MARKET_IDS.length * CLOCK.revealSecondsPerMarket;   // 5 x 48 s = 4 x 60 s (10/27)
+  const expect = 180 + (360 + R5 + 120) + 2 * (240 + R5 + 120) + (240 + R5 + 45);
   assert.equal(p.total, expect);
   assert.equal(p.total, 2625, '43:45 with no early locks: 3:00 practice round, a 6:00 season 1 decide');
   assert.equal(gamePlan(CLOCK, 4, 0.5).total, p.steps.reduce((a, x) => a + Math.max(5, Math.round(x.seconds * 0.5)), 0));
-  assert.equal(stepSeconds(CLOCK, { phase: 'reveal', season: 4, seasons: 4, idx: 4 }, 1), CLOCK.finalRecapSeconds);
+  assert.equal(stepSeconds(CLOCK, { phase: 'reveal', season: 4, seasons: 4, idx: MARKET_IDS.length }, 1), CLOCK.finalRecapSeconds);
   assert.equal(stepSeconds(CLOCK, { phase: 'decide', season: 1, seasons: 4 }, 0.01), 5, 'never under five seconds');
 });
 
@@ -87,13 +89,13 @@ test('after Start, zero clicks: the clock alone runs four seasons to the final r
     assert.equal(await host.tick(), false, key + ': nothing happens before zero');
     assert.equal(stepKey(host.game), key);
     assert.equal(await runOut(host, clock), true, key + ': zero moves the game on');
-    assert.ok(seen.length <= 27, 'no runaway');
+    assert.ok(seen.length <= 3 + 4 * (2 + MARKET_IDS.length), 'no runaway');
   }
   const expect = [['example:0', 60], ['example:1', 60], ['example:2', 60]];
   for (let s = 1; s <= 4; s++) {
     expect.push(['decide:' + s, s === 1 ? 360 : 240]);
-    for (let i = 0; i < 4; i++) expect.push(['reveal:' + s + ':' + i, 60]);
-    expect.push(['reveal:' + s + ':4', s === 4 ? 45 : 120]);
+    for (let i = 0; i < MARKET_IDS.length; i++) expect.push(['reveal:' + s + ':' + i, CLOCK.revealSecondsPerMarket]);
+    expect.push(['reveal:' + s + ':' + MARKET_IDS.length, s === 4 ? 45 : 120]);
   }
   assert.deepEqual(seen, expect);
   assert.equal(host.game.clock, null, 'the final ranking has no clock');
@@ -140,8 +142,8 @@ test('missed deadlines: a saved plan runs, nothing saved means the last plan sta
   assert.equal(host.state.history[1].teams.T3.savedRan, undefined, 'a locked plan is not a saved-plan run');
   // a lock that arrives after the window closed changes nothing for season 1
   await store.patchDecision(host.gid, 'T2', 1, { plan: ok(), locked: true });
-  for (let i = 0; i < 4; i++) await runOut(host, clock);
-  assert.equal(stepKey(host.game), 'reveal:1:4');
+  for (let i = 0; i < MARKET_IDS.length; i++) await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'reveal:1:' + MARKET_IDS.length);
   const res = (await store.getSnapshots(host.gid, { kind: 'result', round: 1, teamId: 'T1' }))[0].data;
   assert.equal(res.savedRan, true, 'the team page is told its saved plan ran');
   await runOut(host, clock);
@@ -274,7 +276,7 @@ async function playGame({ useClock, inject = [] }) {
       await store.patchDecision(host.gid, 'T1', s, { plan: t1, locked: true });
       if (s % 2) await store.patchDecision(host.gid, 'T2', s, { plan: ok([D('denim', 'earth', 'small', 'light')]) });
     }
-    if (g.phase === 'reveal' && g.reveal.idx === 4 && s < 4) await store.patchDecision(host.gid, 'T2', s, { notes: [carry] });
+    if (g.phase === 'reveal' && g.reveal.idx === MARKET_IDS.length && s < 4) await store.patchDecision(host.gid, 'T2', s, { notes: [carry] });
     try { if (useClock) assert.equal(await runOut(host, clock), true); else assert.equal(await host.advance(stepKey(host.game)), true); }
     catch (e) { assert.match(e.message, /injected write failure/); failures++; }
     assert.ok(++steps < 60, 'no runaway');
@@ -382,8 +384,8 @@ test('carry offers written during the recap are collected when its clock ends; o
   const offer = { type: 'carry', market: 'berlin', design: { id: 'D1', cut: 'denim', palette: 'earth', logo: 'small', fabric: 'light' } };
   await store.patchDecision(host.gid, 'T1', 1, { plan: t1, locked: true });
   await store.patchDecision(host.gid, 'T2', 1, { plan: ok([D('denim', 'earth', 'small', 'light')]), locked: true });
-  for (let i = 0; i < 5; i++) await runOut(host, clock);
-  assert.equal(stepKey(host.game), 'reveal:1:4');
+  for (let i = 0; i < MARKET_IDS.length + 1; i++) await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'reveal:1:' + MARKET_IDS.length);
   assert.equal(host.state.history[1].seats.berlin, 'T1', 'T1 holds the Berlin seat');
   await store.patchDecision(host.gid, 'T2', 1, { notes: [offer] });           // during the recap
   await runOut(host, clock);
@@ -394,8 +396,8 @@ test('carry offers written during the recap are collected when its clock ends; o
   // too late: a second offer on the season 1 row once season 2 is open, then season 2 runs to its recap with no new notes
   await store.patchDecision(host.gid, 'T2', 1, { notes: [offer, { ...offer, design: { ...offer.design, id: 'D2', cut: 'shell' } }] });
   await store.patchDecision(host.gid, 'T1', 2, { plan: t1, locked: true });
-  for (let i = 0; i < 5; i++) await runOut(host, clock);
-  assert.equal(stepKey(host.game), 'reveal:2:4');
+  for (let i = 0; i < MARKET_IDS.length + 1; i++) await runOut(host, clock);
+  assert.equal(stepKey(host.game), 'reveal:2:' + MARKET_IDS.length);
   assert.equal(host.state.history[2].seats.berlin, 'T1');
   await store.patchDecision(host.gid, 'T2', 2, { notes: [{ ...offer, design: { ...offer.design, id: 'D3', palette: 'black' } }] });   // on time, season 2 recap
   await runOut(host, clock);

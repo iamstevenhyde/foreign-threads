@@ -87,7 +87,8 @@ test('the public rules carry the new fields the team page prints', () => {
 test('the Berlin Ship reach bonus and tolerance are config, and Berlin is the low-pressure market while the other three are high', () => {
   assert.deepEqual(MK.MARKET_IDS.filter(m => MK.MARKETS[m].pressure === 'low'), ['berlin']);
   assert.deepEqual(MK.MARKET_IDS.filter(m => MK.MARKETS[m].pressure === 'high'), ['tokyo', 'saopaulo', 'nairobi']);
-  for (const m of MK.MARKET_IDS) assert.ok(MK.MARKETS[m].pressure === 'low' ? MK.MARKETS[m].tolerance >= 0.7 : MK.MARKETS[m].tolerance <= 0.3, m);
+  assert.deepEqual(MK.MARKET_IDS.filter(m => MK.MARKETS[m].pressure === 'medium'), ['cdmx'], 'Mexico City (10/27) sits between');
+  for (const m of MK.MARKET_IDS) { const p = MK.MARKETS[m].pressure, t = MK.MARKETS[m].tolerance; assert.ok(p === 'low' ? t >= 0.7 : p === 'medium' ? t > 0.3 && t < 0.7 : t <= 0.3, m); }
 });
 
 test('bot-run regression (20 seeds): adapting beats one design everywhere, seats and carries do not dominate, caps bind less than before', () => {

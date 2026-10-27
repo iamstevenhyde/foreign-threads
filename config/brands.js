@@ -26,6 +26,16 @@ export const BRANDS = [
   { id: 'kroes', name: 'Kroes & Ribas', fact: '', free: [t('palette', 'black'), t('logo', 'none')], costly: t('cut', 'hoodie'), source: 'game design' },
   { id: 'boodraj', name: 'Boodraj Bags', fact: '', free: [t('fabric', 'recycled'), t('logo', 'small')], costly: t('palette', 'bright'), source: 'game design' },
   { id: 'ritters', name: "Ritter's Rags", fact: '', free: [t('cut', 'hoodie'), t('fabric', 'light')], costly: t('logo', 'big'), source: 'game design' },
+  // 10/27: eight more so a room can hold 20 teams. Names AND DNA are invented for play (not AI Corp facts). Chosen so every tile is free for at least
+  // one of the twenty and the costly tiles spread across all four rows.
+  { id: 'sierra', name: 'Sierra Loom', fact: '', free: [t('fabric', 'recycled'), t('palette', 'earth')], costly: t('logo', 'big'), source: 'game design' },
+  { id: 'coastline', name: 'Coastline Supply', fact: '', free: [t('cut', 'resort'), t('palette', 'bright')], costly: t('fabric', 'heavy'), source: 'game design' },
+  { id: 'ironbark', name: 'Ironbark Workwear', fact: '', free: [t('cut', 'denim'), t('fabric', 'heavy')], costly: t('palette', 'pastel'), source: 'game design' },
+  { id: 'juniper', name: 'Juniper & Vale', fact: '', free: [t('palette', 'pastel'), t('logo', 'small')], costly: t('cut', 'puffer'), source: 'game design' },
+  { id: 'northfold', name: 'Northfold', fact: '', free: [t('cut', 'puffer'), t('logo', 'none')], costly: t('palette', 'bright'), source: 'game design' },
+  { id: 'sundown', name: 'Sundown Surf', fact: '', free: [t('fabric', 'light'), t('logo', 'allover')], costly: t('cut', 'shell'), source: 'game design' },
+  { id: 'halyard', name: 'Halyard Marine', fact: '', free: [t('cut', 'shell'), t('fabric', 'performance')], costly: t('logo', 'allover'), source: 'game design' },
+  { id: 'copperline', name: 'Copperline Denim', fact: '', free: [t('cut', 'denim'), t('logo', 'big')], costly: t('fabric', 'performance'), source: 'game design' },
 ];
 
 export const BRAND_BY_ID = Object.fromEntries(BRANDS.map(b => [b.id, b]));

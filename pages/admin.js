@@ -3,7 +3,7 @@
 import { openStore } from './supa.js';
 import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss } from './util.js';
 import { Host } from './host.js';
-import { BRAND_BY_ID, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js';
+import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js';
 import { HOUSE, CLOCK, SEASONS } from '../config/rules.js';
 import { clockLeft, gamePlan, stepKey } from './clock.js';
 import { every } from './ticker.js';
@@ -64,8 +64,8 @@ function landing() {
   const el = h('div.wrap', h('h1', GAME_TITLE + ': host'),
     h('div.card', h('h2', 'New game'),
       h('div.row',
-        h('div', h('label', 'Human teams'), h('input#f-teams', { type: 'number', min: 1, max: 12, value: f.teams, style: 'width:80px' })),
-        h('div', h('label', 'House (AI) teams, 0 to 4'), h('input#f-house', { type: 'number', min: 0, max: HOUSE.maxCount, value: f.house, style: 'width:80px' })),
+        h('div', h('label', 'Human teams'), h('input#f-teams', { type: 'number', min: 1, max: BRANDS.length, value: f.teams, style: 'width:80px' })),
+        h('div', h('label', 'House (AI) teams, 0 to ' + HOUSE.maxCount), h('input#f-house', { type: 'number', min: 0, max: HOUSE.maxCount, value: f.house, style: 'width:80px' })),
         h('div', h('label', 'Seed (blank = random)'), h('input#f-seed', { type: 'number', style: 'width:110px' })),
         h('div', h('label', 'Bot-fill empty teams'), h('input#f-bot', { type: 'checkbox', checked: f.bot }), ' ', h('span.small.muted', 'for testing; labelled BOT, ranked')),
         h('button.primary', { onclick: async () => {
@@ -89,7 +89,7 @@ function tasteCard() {
   if (host.needsCode) {
     return h('div.card', h('h2', 'Enter the room taste code'),
       h('p', 'This browser does not hold the hidden market tastes for ' + host.gid + '. Type the 8-character restore code you wrote down when the game was created.'),
-      h('div.row', h('input#f-code', { type: 'text', placeholder: '4K7Q-X2M9', style: 'width:140px;font:700 18px monospace;text-transform:uppercase' }),
+      h('div.row', h('input#f-code', { type: 'text', placeholder: 'K7QX-2M94K7', style: 'width:170px;font:700 18px monospace;text-transform:uppercase' }),
         h('button.primary', { onclick: () => { try { host.restore($('#f-code').value); toast('Restored'); render(); } catch (e) { toast(e.message, 7000); } } }, 'Restore')));
   }
   return h('div.card', h('h2', 'Room taste code'),
@@ -165,12 +165,12 @@ function render() {
     ctrl.push(h('span.muted', host.autoAdvance ? 'Resolves by itself at zero, or ' + CLOCK.allLockedSeconds + ' s after every human team has locked. ' + (g.settings.savedPlanRuns !== false ? 'A team that has not locked plays its saved plan; with nothing saved, its last plan stands.' : 'A team that never locks keeps its last plan.') : 'Advance on the clock is off: press Skip.'));
   } else if (phase === 'reveal') {
     const idx = g.reveal ? g.reveal.idx : 0;
-    ctrl.push(h('span', 'Reveal step ' + (idx + 1) + ' of 5 (' + (idx < 4 ? MARKETS[MARKET_IDS[idx]].name : 'recap: results and carry offers') + ')'));
+    ctrl.push(h('span', 'Reveal step ' + (idx + 1) + ' of ' + (MARKET_IDS.length + 1) + ' (' + (idx < MARKET_IDS.length ? MARKETS[MARKET_IDS[idx]].name : 'recap: results and carry offers') + ')'));
     ctrl.push(h('b.admin-clock', h('span#clock', clockText(g))), autoBadge());
     ctrl.push(...clockBtns());
     if (idx > 0) ctrl.push(stepBtn('Back', key, k => host.back(k)));
-    ctrl.push(stepBtn(idx < 4 ? 'Skip: next ' + (idx < 3 ? 'market' : 'step (recap)') : st.season >= st.seasons ? 'Skip: finish game' : 'Skip: next season', key, k => host.advance(k),
-      'Optional. Each step moves on by itself when its clock runs out.' + (idx >= 4 ? ' Collects carry offers teams wrote.' : '')));
+    ctrl.push(stepBtn(idx < MARKET_IDS.length ? 'Skip: next ' + (idx < MARKET_IDS.length - 1 ? 'market' : 'step (recap)') : st.season >= st.seasons ? 'Skip: finish game' : 'Skip: next season', key, k => host.advance(k),
+      'Optional. Each step moves on by itself when its clock runs out.' + (idx >= MARKET_IDS.length ? ' Collects carry offers teams wrote.' : '')));
   } else if (phase === 'final') {
     ctrl.push(h('span.ok', 'Game over. Download the log for the debrief.'));
   }

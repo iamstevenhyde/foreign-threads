@@ -625,3 +625,37 @@ body.page-projector { background: var(--paper); overflow: hidden; }
 .ex.proj .ex-card .ex-g { width: 190px; } .ex.proj .ex-card { width: 480px; padding: 12px 16px; }
 .ex.proj .ex-bid p { font-size: 24px; } .ex.proj .ex-bids { min-width: 900px; }
 .ex.proj .ex-shares { min-width: 800px; } .ex.proj .exs i { height: 34px; } .ex.proj .exs span { font-size: 52px; }
+/* 10/27: 20-team rooms. Share rows are tighter (up to 8 rows plus one folded line) and the bid list marks the winning (PAID) bids. */
+.shr { padding: 7px 0; }
+.shr-n b { font-size: 30px; }
+.shr-p { font-size: 44px; }
+.shr-bar { height: 28px; }
+.shr.more b { font-size: 24px; color: var(--muted); }
+.pm-bids { font-size: 19px; }
+.pm-bids .won { color: var(--ink); font-weight: 700; }
+/* 10/27: big rooms (up to 20 brands) on the 1920 x 1080 stage */
+.pl-brands.many { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+.pl-brands.many .pbrand .pb-dna { display: none; }
+.pl-brands.many .pbrand { padding: 6px 0; }
+.pl-brands.many .pbrand b { font-size: 26px; }
+.pt-grid.many { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.pt-grid.many .ptile { padding: 6px 8px; }
+.pt-grid.many .ptile b { font-size: 20px; }
+.pf-rank.many li { padding: 2px 0; grid-template-columns: 80px 44px 1fr 60px auto; gap: 12px; }
+.pf-rank.many .gsvg.pf-g { height: 60px; }
+.pf-rank.many .rk, .pf-rank.many b, .pf-rank.many .pr { font-size: 38px; }
+.cc-rest { font-size: 20px; color: var(--muted); margin: 10px 0 0; }
+
+/* 10/27: the practice bid */
+.ex-practice { border: 2px solid var(--ink); background: var(--card); padding: 14px 18px; margin: 12px 0; max-width: 720px; }
+.ex-practice h2 { font-family: var(--serif); font-weight: 400; font-size: 28px; margin: 4px 0 6px; }
+.ex-practice .stepper { margin: 8px 0; }
+.ex-practice .warn { color: #b3261e; font-weight: 600; }
+.ex-practice.won { border-color: var(--cobalt); } .ex-practice.won h2 { color: var(--cobalt); }
+.ex-ranks { display: grid; gap: 4px; margin-top: 8px; } .ex-ranks div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding: 3px 0; }
+.ex-ranks .won b { color: var(--cobalt); } .ex-ranks .me { font-weight: 700; }
+.ex.proj .ex-practice { max-width: 900px; font-size: 24px; } .ex.proj .ex-practice h2 { font-size: 44px; }
+.ex.proj { position: relative; }
+.ex.proj .ex-practice { position: absolute; right: 24px; bottom: 30px; width: 640px; margin: 0; font-size: 22px; padding: 12px 16px; }
+.ex.proj .ex-practice h2 { font-size: 38px; margin: 2px 0 4px; }
+.ex.proj .ex-practice p { margin: 4px 0; }

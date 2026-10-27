@@ -46,6 +46,8 @@ export const BRAND_COLOURS = [
   { id: 'ink', hex: '#1b1a17' }, { id: 'red', hex: '#d02b26' }, { id: 'orange', hex: '#e2591f' }, { id: 'mustard', hex: '#d39a17' },
   { id: 'forest', hex: '#1f6b4f' }, { id: 'teal', hex: '#13808a' }, { id: 'navy', hex: '#23355f' }, { id: 'violet', hex: '#5b3aa8' },
   { id: 'plum', hex: '#7a2c5e' }, { id: 'pink', hex: '#d94f86' }, { id: 'rust', hex: '#a8512a' }, { id: 'tan', hex: '#a8793f' },
+  { id: 'cobalt', hex: '#2448d8' }, { id: 'grass', hex: '#3e7d2a' }, { id: 'wine', hex: '#8c1d2f' }, { id: 'slate', hex: '#5f6b73' },
+  { id: 'ocean', hex: '#0e5a7a' }, { id: 'lavender', hex: '#8a63c9' }, { id: 'cocoa', hex: '#6b4f2a' }, { id: 'olive', hex: '#6f7d1e' },
 ];
 // Default mark and colour per brand. Colours follow art/brands/BRANDS.md where the source logo has one, nudged apart so no two brands in a room
 // share a colour; Rank has no logo in the source, so it takes the red slashes from Steven's mockup.
@@ -54,6 +56,10 @@ export const DEFAULT_STYLE = {
   blackpeak: { mark: 'peak', colour: '#23355f' }, ritz: { mark: 'bolt', colour: '#1f6b4f' }, cruzwear: { mark: 'arch', colour: '#a8512a' },
   ratfang: { mark: 'star', colour: '#7a2c5e' }, murphies: { mark: 'shield', colour: '#a8793f' }, newport: { mark: 'wave', colour: '#13808a' },
   kroes: { mark: 'ring', colour: '#5b3aa8' }, boodraj: { mark: 'sun', colour: '#d39a17' }, ritters: { mark: 'pixel', colour: '#d94f86' },
+  // 10/27: the eight brands added for 20-team rooms; each takes one of the eight new colours, so no two of the twenty share a colour
+  sierra: { mark: 'peak', colour: '#3e7d2a' }, coastline: { mark: 'wave', colour: '#2448d8' }, ironbark: { mark: 'block', colour: '#6b4f2a' },
+  juniper: { mark: 'arch', colour: '#8a63c9' }, northfold: { mark: 'star', colour: '#5f6b73' }, sundown: { mark: 'sun', colour: '#8c1d2f' },
+  halyard: { mark: 'ring', colour: '#0e5a7a' }, copperline: { mark: 'shield', colour: '#6f7d1e' },
 };
 const HEX = /^#[0-9a-f]{6}$/i;
 export function cleanStyle(st, brandId) {

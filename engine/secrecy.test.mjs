@@ -54,7 +54,7 @@ test('static text in the repo names no tile: clue cards are filled from the draw
     const h = hit([e.headline, e.standfirst, e.body, e.rule].join(' '));
     assert.deepEqual(h, [], e.id + ' static text names tile word(s) ' + h.join(', '));
   }
-  assert.equal(CLUE_CARDS.length, 16);
+  assert.equal(CLUE_CARDS.length, MARKET_IDS.length * 4);
   assert.ok(CLUE_CARDS.every(c => c.text === undefined), 'clue cards hold no tile text');
 });
 
@@ -73,7 +73,7 @@ test('team-facing state carries no tastes: views, public config, the saved state
   const store = new LocalStore();
   const host = await Host.create(store, { teams: 2, house: 2, seed: 4242, botFill: true });
   const secret = host.tastes, code = host.restoreCode;
-  assert.ok(secret && /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(code));
+  assert.ok(secret && /^[0-9A-Z]{4}-[0-9A-Z]{6}$/.test(code));
   for (const m of MARKET_IDS) assert.notDeepEqual(secret[m], REFERENCE_TASTES[m], 'a live room never repeats the old fixed table');
 
   const scan = label => {
