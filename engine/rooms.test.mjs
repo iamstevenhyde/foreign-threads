@@ -23,7 +23,7 @@ const { Host } = await import('../pages/host.js');
 for (const [n, house] of [[8, 2], [12, 4], [20, 10]]) {
   test('a room of ' + n + ' teams (' + house + ' house) plays four seasons; seats per market and pool scale follow the room size', () => {
     const K = R.seatsFor(n), k = R.poolScale(n);
-    assert.equal(K, n <= 10 ? 1 : 2);
+    assert.equal(K, n <= 8 ? 1 : 2);
     for (const seed of [1, 2, 3]) {
       const { state } = playGame({ seed, teams: n, house, seasons: 4, quiet: true });
       assert.equal(state.order.length, n);
@@ -144,4 +144,24 @@ test('student-facing text added on 10/27 carries no em-dash', async () => {
   for (const f of ['pages/example.js', 'pages/team.js', 'pages/proj.js', 'config/example.js', 'config/markets.js', 'config/brands.js']) {
     assert.ok(!fs.readFileSync(path.join(root, f), 'utf8').includes('—'), f);
   }
+});
+
+test('default fallback: a partner line that never touches the fallback ships in when its bid loses, except in Nairobi where Ship is closed', () => {
+  assert.equal(R.defaultFallback(MK.MARKETS.berlin.rules.modes), 'ship');
+  assert.equal(R.defaultFallback(MK.MARKETS.cdmx.rules.modes), 'ship');
+  assert.equal(R.defaultFallback(MK.MARKETS.nairobi.rules.modes), 'none');
+  assert.equal(R.defaultFallback(undefined), 'none');
+  const ids = BRANDS.slice(0, 10).map((b, i) => ['T' + (i + 1), b.id]);
+  const P = D('shell', 'black', 'none', 'recycled');
+  const st = game(ids);
+  const fb = m => R.defaultFallback(MK.MARKETS[m].rules.modes);
+  const subs = {};
+  ids.forEach(([id], i) => { subs[id] = lock(plan([P], {
+    berlin: line('D1', { mode: 'partner', bid: 1.5 - i * 0.1, fallback: fb('berlin') }),
+    nairobi: line('D1', { mode: 'partner', bid: 1.5 - i * 0.1, fallback: fb('nairobi') }) })); });
+  season(st, subs);
+  assert.equal(st.seatsPerMarket, 2, 'ten teams get two seats now');
+  assert.equal(row(st, 1, 'T3', 'berlin').seat_paid, 0);
+  assert.equal(row(st, 1, 'T3', 'berlin').mode, 'ship', 'lost the Berlin seat, shipped by default');
+  assert.equal(row(st, 1, 'T3', 'nairobi').mode, 'none', 'lost the Nairobi seat, no Ship there, sits out');
 });

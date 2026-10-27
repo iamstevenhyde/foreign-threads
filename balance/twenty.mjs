@@ -6,9 +6,9 @@ import { playGame } from '../engine/run_bots.mjs';
 import { designFor, assemble, fitToCash, bestPrice, chooseLine } from '../engine/bots.mjs';
 import { MARKET_IDS } from '../config/markets.js';
 import * as R from '../config/rules.js';
-// experiment knobs: --pool <perTeam> --seats <n for 13+ teams> --spread <lo,hi>   (edit config/rules.js to keep a change)
+// experiment knobs: --pool <perTeam> --seats <n for 9+ teams> --spread <lo,hi>   (edit config/rules.js to keep a change)
 { const i = process.argv.indexOf('--pool'); if (i > 0) R.POOL_SCALE.perTeam = Number(process.argv[i + 1]); }
-{ const i = process.argv.indexOf('--seats'); if (i > 0) { const n = Number(process.argv[i + 1]); R.PARTNER.seatsByTeams[1][1] = n; R.PARTNER.seatsByTeams[2][1] = n; } }
+{ const i = process.argv.indexOf('--seats'); if (i > 0) { const n = Number(process.argv[i + 1]); R.PARTNER.seatsByTeams[1][1] = n; } }
 { const i = process.argv.indexOf('--spread'); if (i > 0) R.HOUSE.bidSpread = process.argv[i + 1].split(',').map(Number); }
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? Number(process.argv[i + 1]) : d; };

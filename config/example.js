@@ -49,7 +49,7 @@ export const EXAMPLE_TEXT = [
       'Both brands here want the local-partner seat, so each writes a sealed bid. Alder also names a fallback: ship in if the bid loses.',
       'Every city has public weights, shown here. What a city likes inside each row stays hidden until you learn it.'] },
   { kicker: 'Practice round, step 2 of 3', head: 'The sealed bids.', lines: [
-      'The highest bid takes the seat (in a room of more than ten teams each city has two seats, and the two highest bids win). The winning bid is PAID. It is spent, not held, and it does not come back.',
+      'The highest bid takes the seat (in a room of more than eight teams each city has two seats, and the two highest bids win). The winning bid is PAID. It is spent, not held, and it does not come back.',
       'A losing bid is returned in full, and the loser plays its fallback.'] },
   { kicker: 'Practice round, step 3 of 3', head: 'The reveal.', lines: [
       'The projector shows who won each city and by how much. Only the winning piece is shown, so everyone else\'s design stays private.',

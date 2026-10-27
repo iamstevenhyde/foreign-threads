@@ -122,7 +122,7 @@ export function createGame({ seed = 1, teams, seasons = R.SEASONS, startCash = R
     state.teams[t.id] = t; state.order.push(t.id);
     state.tables.ww_brands.push({ game_id: state.gameId, team_id: t.id, brand_id: b.id, name: t.name, free_tiles: b.free, costly_tile: b.costly, start_cash: startCash, house: t.house });
   }
-  // 10/27: room size sets the partner seats per market and the pool scale (config/rules.js seatsFor, poolScale). Rooms of up to 12 teams keep 1 seat.
+  // 10/27: room size sets the partner seats per market and the pool scale (config/rules.js seatsFor, poolScale). Rooms of up to 8 teams keep 1 seat, larger rooms get 2.
   state.seatsPerMarket = R.seatsFor(state.order.length);
   state.poolScale = R.poolScale(state.order.length);
   attachTastes(state, tastes);

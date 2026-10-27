@@ -65,7 +65,9 @@ export const FOG = { perSeasonSold: 1, partnerReveals: 1, clueCardReveals: 1, re
 // Partner seat: one per market per season, sealed bid, highest wins, ties broken by seeded draw. The winner reveals one taste row at once.
 // 10/27: a big room gets more seats per market (seatsFor). With 20 teams and five markets that is 10 seats a season, so most teams can win one.
 // The top bids win, each winner PAYS its own bid, every losing bid is refunded. The first seat (highest bid) is the one a rival can ask to be carried on.
-export const PARTNER = { seatsPerMarket: 1, revealRows: 1, seatsByTeams: [[10, 1], [16, 2], [99, 2]] };
+export const PARTNER = { seatsPerMarket: 1, revealRows: 1, seatsByTeams: [[8, 1], [99, 2]] };
+// What a plan does by default when its partner bid loses (10/27): ship in where Ship is open, otherwise sit out (Nairobi has no formal distributor).
+export const defaultFallback = modes => (modes && modes.includes('ship') ? 'ship' : 'none');
 export const seatsFor = n => (PARTNER.seatsByTeams.find(([max]) => n <= max) || [0, PARTNER.seatsPerMarket])[1];
 
 // Team-to-team carry (Steven 10/21): the holder of the partner seat in a market may carry one rival's line there.

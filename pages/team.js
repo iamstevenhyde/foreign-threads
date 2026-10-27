@@ -8,7 +8,7 @@ import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeG
 import { clockLeft } from './clock.js';
 import { exampleScreen } from './example.js';
 import { validateWith } from '../engine/core.mjs';
-import { BID_HINT } from '../config/rules.js';
+import { BID_HINT, defaultFallback } from '../config/rules.js';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
   MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js';
 import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js';
@@ -407,7 +407,7 @@ function modeCards(m) {
   const taxIdx = Math.min(view.active[m] || 0, pm.taxBySeason.length - 1), tax = Math.round(pm.taxBySeason[taxIdx] * 100), taxP = Math.round(pm.taxBySeason[taxIdx] * view.pub.PARTNER_TAX_CUT * 100);
   const reach = view.pub.SHARE.reach, ship = Math.round(Math.min(1.5, reach.ship + (pm.shipReachBonus || 0)) * 100), own = Math.round(reach.own * 100), ramp = Math.round(reach.own * view.pub.MODES.own.ownRampFirstSeason * 100);
   const offer = view.myOffers.find(o => o.market === m);
-  const set = patch => { plan.markets[m] = { mode: 'none', design: designIds()[0] || '', price: 'standard', run: 50, bid: 0, fallback: 'none', ...plan.markets[m], ...patch }; changed(); };
+  const set = patch => { plan.markets[m] = { mode: 'none', design: designIds()[0] || '', price: 'standard', run: 50, bid: 0, fallback: defaultFallback(view.pub.markets[m].rules.modes), ...plan.markets[m], ...patch }; changed(); };
   const pick = mode => {
     if (mode === 'none') { plan.markets[m] = { ...(plan.markets[m] || {}), mode: 'none' }; changed(); return; }
     if (mode === 'carried') {
@@ -422,7 +422,7 @@ function modeCards(m) {
   const cards = [
     { k: 'none', t: 'Stay out', c: '$0 committed', d: 'Keep focus elsewhere. You learn nothing new here this season.' },
     { k: 'ship', t: 'Ship in', c: 'Tax ' + tax + '%' + (pm.rules.dutyShipped ? ' · duty ' + Math.round(pm.rules.dutyShipped * 100) + '%' : ' · no duty'), d: 'Reaches ' + ship + '% as many buyers as a partner. You keep every sale.', off: !pm.rules.modes.includes('ship') && 'No formal distributor here, so nothing can be shipped in.' },
-    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. ' + seatWords() + ' Each winning bid is PAID (spent, not held); losers are refunded and their fallback runs.' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
+    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. ' + seatWords() + ' Each winning bid is PAID (spent, not held); losers are refunded and their fallback runs (ship in by default where that is open).' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
     { k: 'own', t: 'Own shop', c: (view.owned[m] ? 'Set-up already paid' : 'Set-up ' + money(view.pub.MODES.own.setup)) + ' · tax ' + tax + '%', d: 'Reaches ' + own + '% of a partner, only ' + ramp + '% in your first season here. Paid at once, no partner share.' },
   ];
   if (offer) cards.push({ k: 'carried', t: 'Carried by ' + brandName(offer.holder), c: 'Fee ' + money(view.pub.CARRY.fee) + ' · tax ' + taxP + '%', d: 'Rides on their partner seat if they win it again. They see your design.' });
@@ -448,7 +448,7 @@ function lineSettings(m) {
 }
 function bidBox(m) {
   const line = plan.markets[m] || {}, bid = Number(line.bid) || 0, need = line.mode === 'partner';
-  const set = v => { v = Math.max(0, Math.round(v * 10) / 10); plan.markets[m] = { mode: 'none', design: designIds()[0] || '', price: 'standard', run: 50, fallback: 'none', ...plan.markets[m], bid: v }; changed(); };
+  const set = v => { v = Math.max(0, Math.round(v * 10) / 10); plan.markets[m] = { mode: 'none', design: designIds()[0] || '', price: 'standard', run: 50, fallback: defaultFallback(view.pub.markets[m].rules.modes), ...plan.markets[m], bid: v }; changed(); };
   return h('div.bid' + (need ? '.need' : ''),
     h('div', h('span.lbl', need ? 'Sealed bid for the partner seat' : 'Bid for the seat anyway (optional)'),
       h('p.note', 'Max ' + money(view.bidCap) + ' (' + Math.round(view.pub.BUDGET.partnerBidCap * 100) + '% of cash), at least ' + money(view.pub.BUDGET.minPartnerBid) + '. ' + seatWords() + ' A winning bid is PAID (spent, not held). A losing bid is refunded.'),
