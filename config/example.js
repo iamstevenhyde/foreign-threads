@@ -1,7 +1,7 @@
 // The worked-example round (Steven 10/26): a practice walk-through before season 1 on made-up brands in a made-up city, so the room sees one full
 // cycle (choose, sealed bid, reveal) before it plays for real. Nothing here is a real market, nothing here touches the engine or the score, and the
 // example city's taste is not any room's hidden taste. Numbers use the real share formula (fit ^ exponent x reach) so the example behaves like the game.
-import { SHARE } from './rules.js?v=c89ef327';
+import { SHARE } from './rules.js?v=9c995793';
 
 export const EXAMPLE_STEPS = 3;     // 0 choose, 1 sealed bids, 2 reveal
 
@@ -60,7 +60,7 @@ export const EXAMPLE_TEXT = [
 // Made-up rival bids for one Example City partner seat (or two in a big room, the same rule as the real game: rules.js seatsFor). The student
 // plays a made-up brand with the real game's starting cash, so the cap and the minimum are the real ones. Nothing is written to the store and
 // nothing counts; a student who joins late or never types a bid plays the default.
-import { BUDGET, BID_HINT, seatsFor } from './rules.js?v=c89ef327';
+import { BUDGET, BID_HINT, seatsFor } from './rules.js?v=9c995793';
 
 export const PRACTICE = {
   brand: 'Your practice brand',

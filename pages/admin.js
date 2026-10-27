@@ -1,13 +1,13 @@
 // Admin / host page. Creates a game, shows join codes, runs the clock and the reveal, and runs the engine (host.js).
 // After Start the game runs itself on the clock (host.tick, driven by a worker tick in ticker.js); every button below Start is an optional override.
-import { openStore } from './supa.js?v=c89ef327';
-import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=c89ef327';
-import { BUILD } from './build.js?v=c89ef327';
-import { Host } from './host.js?v=c89ef327';
-import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=c89ef327';
-import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=c89ef327';
-import { clockLeft, gamePlan, stepKey } from './clock.js?v=c89ef327';
-import { every } from './ticker.js?v=c89ef327';
+import { openStore } from './supa.js?v=9c995793';
+import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=9c995793';
+import { BUILD } from './build.js?v=9c995793';
+import { Host } from './host.js?v=9c995793';
+import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=9c995793';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=9c995793';
+import { clockLeft, gamePlan, stepKey } from './clock.js?v=9c995793';
+import { every } from './ticker.js?v=9c995793';
 
 const app = $('#app');
 let store, host = null, ready = {}, readyRound = 0, claimed = {}, busy = false, timer = null, unsub = null;

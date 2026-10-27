@@ -1,16 +1,16 @@
 // Shared bits for the three Foreign Threads pages: tile labels, art paths, small renderers.
 // Garments are drawn in code (garment.js). The 20 garment photos stay in art/garments for a later return but no page loads them.
 // Scene and event art is served as compressed WebP from art/web (see art/web/README.txt); the PNG originals stay where they were.
-import { h } from './util.js?v=c89ef327';
-import { ROWS, ROW_LABEL, TILES, tileLabel, PALETTES } from '../config/tiles.js?v=c89ef327';
-import { MARKETS, MARKET_IDS } from '../config/markets.js?v=c89ef327';
-import { BRAND_BY_ID, BRANDS, dnaState } from '../config/brands.js?v=c89ef327';
-import { garmentSVG, markSVG, cleanStyle, cleanLook } from './garment.js?v=c89ef327';
+import { h } from './util.js?v=9c995793';
+import { ROWS, ROW_LABEL, TILES, tileLabel, PALETTES } from '../config/tiles.js?v=9c995793';
+import { MARKETS, MARKET_IDS } from '../config/markets.js?v=9c995793';
+import { BRAND_BY_ID, BRANDS, dnaState } from '../config/brands.js?v=9c995793';
+import { garmentSVG, markSVG, cleanStyle, cleanLook } from './garment.js?v=9c995793';
 
 export { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRAND_BY_ID, BRANDS, dnaState };
 
 export const GAME_TITLE = 'Foreign Threads';
-import { BUILD } from './build.js?v=c89ef327';
+import { BUILD } from './build.js?v=9c995793';
 export const art = p => '../art/' + p + '?v=' + BUILD.id;   // build id in the query so a replaced picture is never served from an old cache
 // The old photo path, kept so photos can come back later (not called by any page in this build).
 export const garmentSrc = (cut, palette) => art('garments/wk10_cut-' + cut + '_pal-' + palette + '.png');

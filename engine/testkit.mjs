@@ -1,6 +1,6 @@
 // Helpers for the engine tests: tiny hand-built games with no news cards, so each rule can be checked on its own.
-import { createGame, beginSeason, resolveSeason, makeOffers } from './core.mjs?v=c89ef327';
-import { REFERENCE_TASTES } from './reference_tastes.mjs?v=c89ef327';
+import { createGame, beginSeason, resolveSeason, makeOffers } from './core.mjs?v=9c995793';
+import { REFERENCE_TASTES } from './reference_tastes.mjs?v=9c995793';
 
 export const D = (cut, palette, logo, fabric, id = 'D1') => ({ id, cut, palette, logo, fabric });
 // True tastes (REFERENCE_TASTES, the fixture every test game uses unless it passes opts.tastes): Berlin shell/black/none/recycled, Tokyo denim/earth/small/light, Sao Paulo resort/bright/allover/light, Nairobi hoodie/pastel/big/heavy.

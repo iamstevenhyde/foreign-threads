@@ -5,18 +5,18 @@
 // Snapshots (ww_snapshots): kind 'state' round 0 (full engine state, so an admin reload resumes), 'view' per team per season (teamView at season open),
 // 'public' per season (news + roster), 'reveal' per season (what the projector may show), 'result' per team per season (private results), 'final'.
 
-import { createGame, attachTastes, beginSeason, teamView, resolveSeason, makeOffers, standings, exportTables, rand } from '../engine/core.mjs?v=c89ef327';
-import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from '../engine/bots.mjs?v=c89ef327';
-import { BRANDS } from '../config/brands.js?v=c89ef327';
-import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=c89ef327';
-import { MARKET_IDS } from '../config/markets.js?v=c89ef327';
-import { makeCode, makeGameId } from './util.js?v=c89ef327';
-import { BUILD } from './build.js?v=c89ef327';
-import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js?v=c89ef327';
-import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs?v=c89ef327';
-import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js?v=c89ef327';
-import { cleanLook } from './garment.js?v=c89ef327';
-import { EXAMPLE_STEPS } from '../config/example.js?v=c89ef327';
+import { createGame, attachTastes, beginSeason, teamView, resolveSeason, makeOffers, standings, exportTables, rand } from '../engine/core.mjs?v=9c995793';
+import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from '../engine/bots.mjs?v=9c995793';
+import { BRANDS } from '../config/brands.js?v=9c995793';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=9c995793';
+import { MARKET_IDS } from '../config/markets.js?v=9c995793';
+import { makeCode, makeGameId } from './util.js?v=9c995793';
+import { BUILD } from './build.js?v=9c995793';
+import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js?v=9c995793';
+import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs?v=9c995793';
+import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js?v=9c995793';
+import { cleanLook } from './garment.js?v=9c995793';
+import { EXAMPLE_STEPS } from '../config/example.js?v=9c995793';
 
 // The room's hidden tastes never go to the store (Supabase or local) and never into a snapshot. They live in this browser's localStorage under the
 // room id, and the host writes down the short restore code (config/taste.js) so a cleared browser or a second laptop can pick the room up again.

@@ -3,15 +3,15 @@
 // the season's plan, and a round-0 row that holds the team's brand mark and colour (cosmetic, read by the projector).
 // Layout (10/24 redesign): tabs Studio / Markets / Rival Lookbook, the news as "The Thread", and a dock along the bottom with cash, what the plan
 // holds, what is still open, the clock and the lock button.
-import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat } from './supa.js?v=c89ef327';
-import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=c89ef327';
-import { clockLeft } from './clock.js?v=c89ef327';
-import { exampleScreen } from './example.js?v=c89ef327';
-import { validateWith } from '../engine/core.mjs?v=c89ef327';
-import { BID_HINT, defaultFallback } from '../config/rules.js?v=c89ef327';
+import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat } from './supa.js?v=9c995793';
+import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=9c995793';
+import { clockLeft } from './clock.js?v=9c995793';
+import { exampleScreen } from './example.js?v=9c995793';
+import { validateWith } from '../engine/core.mjs?v=9c995793';
+import { BID_HINT, defaultFallback } from '../config/rules.js?v=9c995793';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
-  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=c89ef327';
-import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=c89ef327';
+  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=9c995793';
+import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=9c995793';
 
 const app = $('#app');
 let planP = null, store, seat = null, game = null, team = null, allTeams = [], view = null, result = null, finalSnap = null, plan = null, why = '', locked = false, notes = [],

@@ -4,13 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRANDS } from '../config/brands.js?v=c89ef327';
-import { HOUSE, POOLS } from '../config/rules.js?v=c89ef327';
-import { MARKET_IDS, MARKETS } from '../config/markets.js?v=c89ef327';
-import { REFERENCE_TASTES } from './reference_tastes.mjs?v=c89ef327';
-import { drawTastes, seededInt, tastesFromCode, codeFromTastes } from '../config/taste.js?v=c89ef327';
-import { createGame, beginSeason, teamView, resolveSeason, makeOffers, exportTables, finalRanking, rand } from './core.mjs?v=c89ef327';
-import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from './bots.mjs?v=c89ef327';
+import { BRANDS } from '../config/brands.js?v=9c995793';
+import { HOUSE, POOLS } from '../config/rules.js?v=9c995793';
+import { MARKET_IDS, MARKETS } from '../config/markets.js?v=9c995793';
+import { REFERENCE_TASTES } from './reference_tastes.mjs?v=9c995793';
+import { drawTastes, seededInt, tastesFromCode, codeFromTastes } from '../config/taste.js?v=9c995793';
+import { createGame, beginSeason, teamView, resolveSeason, makeOffers, exportTables, finalRanking, rand } from './core.mjs?v=9c995793';
+import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from './bots.mjs?v=9c995793';
 
 function arg(name, def) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : def; }
 
