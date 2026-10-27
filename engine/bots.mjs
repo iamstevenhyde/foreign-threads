@@ -1,11 +1,11 @@
 // Scripted players for the headless run: the three house personalities (config/rules.js HOUSE) and a spread of simple strategies for the other seats.
 // A bot reads only teamView() output (fog applied) and returns a plan; it never sees a taste or a weight. Randomness only through the rand() it is given.
 
-import { ROWS, tileIds } from '../config/tiles.js';
-import { MARKET_IDS, MARKETS } from '../config/markets.js';
-import { dnaState } from '../config/brands.js';
-import { HOUSE } from '../config/rules.js';
-import { costPlan } from './core.mjs';
+import { ROWS, tileIds } from '../config/tiles.js?v=c89ef327';
+import { MARKET_IDS, MARKETS } from '../config/markets.js?v=c89ef327';
+import { dnaState } from '../config/brands.js?v=c89ef327';
+import { HOUSE } from '../config/rules.js?v=c89ef327';
+import { costPlan } from './core.mjs?v=c89ef327';
 
 const TIER = HOUSE.tierWeight;
 // Bot-side knobs (not game rules). Exposed so balance/batch.mjs can sweep them with --set TUNE.name=value.

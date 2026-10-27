@@ -2,12 +2,12 @@
 // spread, and one final ranking. 1920 x 1080 stage scaled to the screen. Every step after Start shows its countdown in the masthead (yellow chip)
 // and as a bar along the bottom edge; the admin page moves the game on at zero.
 // Garments are drawn in code (garment.js); each brand's mark and colour come from its round-0 decisions row, each piece's look from the reveal snapshot.
-import { openStore } from './supa.js';
-import { h, $, $$, params, mmss, friendlyError } from './util.js';
-import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js';
-import { cleanStyle, cleanLook } from './garment.js';
-import { clockLeft } from './clock.js';
-import { exampleScreen } from './example.js';
+import { openStore } from './supa.js?v=c89ef327';
+import { h, $, $$, params, mmss, friendlyError } from './util.js?v=c89ef327';
+import { MARKETS, MARKET_IDS, BRAND_BY_ID, dnaChips, tag, tilesCaps, pctf, MODE_LABEL, streetSrc, lobbySrc, eventArt, money, GAME_TITLE, garmentEl, markEl, lazyImg, ROWS, tileLabel, ROW_LABEL } from './ui.js?v=c89ef327';
+import { cleanStyle, cleanLook } from './garment.js?v=c89ef327';
+import { clockLeft } from './clock.js?v=c89ef327';
+import { exampleScreen } from './example.js?v=c89ef327';
 
 const app = $('#app');
 let store, gid, game = null, pub = null, reveal = null, prevReveal = null, ready = {}, teams = [], seats = [], finalSnap = null, styles = {};
@@ -111,11 +111,11 @@ function marketCard(m) {
   const evs = reveal.events.filter(e => e.market === m);
   const lines = [...M.lines].sort((a, b) => b.share - a.share);
   const wl = lines.find(l => l.win);
-  // Steven 10/26: winners only. The winning piece is drawn; every seller (and the local rival) shows as brand, entry mode and percent of buyers.
+  // Steven 10/26: winners only. The winning piece is drawn; every seller (and the local firm) shows as brand, entry mode and percent of buyers.
   const rows = [...lines.map(l => ({ name: nameOf(l.team), st: styleOf(l.team), mode: MODE_LABEL[l.mode], share: l.share, win: !!l.win, tg: rosterOf(l.team) })),
-    { name: M.incumbent.name, st: null, mode: 'Local rival', share: M.incumbent.share, win: false, tg: {} }].sort((a, b) => b.share - a.share);
+    { name: M.incumbent.name, st: null, mode: 'Local firm', share: M.incumbent.share, win: false, tg: {} }].sort((a, b) => b.share - a.share);
   const top = Math.max(0.01, ...rows.map(r => r.share));
-  // 10/27: up to 20 sellers. Show the top SHOW_ROWS (the winner and the local rival always among them) and fold the rest into one line.
+  // 10/27: up to 20 sellers. Show the top SHOW_ROWS (the winner and the local firm always among them) and fold the rest into one line.
   const SHOW_ROWS = 8;
   let shown = rows.slice(0, SHOW_ROWS);
   for (const keep of rows.filter(r => r.win || !r.st)) if (!shown.includes(keep)) shown = [...shown.slice(0, -1), keep];

@@ -11,7 +11,7 @@
 // choice the engine does not count. Likewise no artwork "none": No logo is a scored tile.
 // Pure string building; safe to import in Node (the host's tests import host.js, which imports this file).
 
-import { PALETTES, TILES, tileLabel } from '../config/tiles.js';
+import { PALETTES, TILES, tileLabel } from '../config/tiles.js?v=c89ef327';
 
 // ---------- cosmetic option sets ----------
 export const TRIMS = [

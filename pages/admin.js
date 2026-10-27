@@ -1,12 +1,13 @@
 // Admin / host page. Creates a game, shows join codes, runs the clock and the reveal, and runs the engine (host.js).
 // After Start the game runs itself on the clock (host.tick, driven by a worker tick in ticker.js); every button below Start is an optional override.
-import { openStore } from './supa.js';
-import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss } from './util.js';
-import { Host } from './host.js';
-import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js';
-import { HOUSE, CLOCK, SEASONS } from '../config/rules.js';
-import { clockLeft, gamePlan, stepKey } from './clock.js';
-import { every } from './ticker.js';
+import { openStore } from './supa.js?v=c89ef327';
+import { h, $, params, setParam, toast, download, friendlyError, pageMode, mmss, safeGet, safeSet, buildLabel } from './util.js?v=c89ef327';
+import { BUILD } from './build.js?v=c89ef327';
+import { Host } from './host.js?v=c89ef327';
+import { BRAND_BY_ID, BRANDS, dnaChips, tag, MARKETS, MARKET_IDS, GAME_TITLE } from './ui.js?v=c89ef327';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=c89ef327';
+import { clockLeft, gamePlan, stepKey } from './clock.js?v=c89ef327';
+import { every } from './ticker.js?v=c89ef327';
 
 const app = $('#app');
 let store, host = null, ready = {}, readyRound = 0, claimed = {}, busy = false, timer = null, unsub = null;
@@ -60,25 +61,35 @@ function stepBtn(label, key, fn, title) {
 }
 
 function landing() {
-  const f = { teams: 6, house: 2, seed: '', bot: pageMode() === 'local' };
+  const f = { teams: 20, seed: '', bot: pageMode() === 'local' };
   const el = h('div.wrap', h('h1', GAME_TITLE + ': host'),
     h('div.card', h('h2', 'New game'),
       h('div.row',
-        h('div', h('label', 'Human teams'), h('input#f-teams', { type: 'number', min: 1, max: BRANDS.length, value: f.teams, style: 'width:80px' })),
-        h('div', h('label', 'House (AI) teams, 0 to ' + HOUSE.maxCount), h('input#f-house', { type: 'number', min: 0, max: HOUSE.maxCount, value: f.house, style: 'width:80px' })),
+        h('div', h('label', 'Total teams, 4 to ' + BRANDS.length), h('input#f-teams', { type: 'number', min: 4, max: BRANDS.length, value: f.teams, style: 'width:80px' })),
         h('div', h('label', 'Seed (blank = random)'), h('input#f-seed', { type: 'number', style: 'width:110px' })),
-        h('div', h('label', 'Bot-fill empty teams'), h('input#f-bot', { type: 'checkbox', checked: f.bot }), ' ', h('span.small.muted', 'for testing; labelled BOT, ranked')),
+        h('div', h('label', 'Bot-fill empty teams'), h('input#f-bot', { type: 'checkbox', checked: f.bot }), ' ', h('span.small.muted', 'for testing; labelled BOT, ranked. Off (normal): every team nobody claimed becomes a house AI team at Start')),
         h('button.primary', { onclick: async () => {
           try {
-            host = await Host.create(store, { teams: +$('#f-teams').value, house: +$('#f-house').value, seed: $('#f-seed').value, botFill: $('#f-bot').checked });
+            const total = Math.round(+$('#f-teams').value);
+            if (!(total >= 4 && total <= BRANDS.length)) throw new Error('Total teams must be 4 to ' + BRANDS.length + '.');
+            host = await Host.create(store, { teams: total, house: 0, fillHouse: true, seed: $('#f-seed').value, botFill: $('#f-bot').checked });
             setParam('g', host.gid); attach(); await refresh();
           } catch (e) { toast(friendlyError(e), 9000); }
         } }, 'Create game'))),
     h('div.card', h('h2', 'Recent games'), h('div#recent', 'Loading...')));
   app.replaceChildren(el);
-  store.listGames(10).then(gs => {
-    $('#recent').replaceChildren(...(gs.length ? gs.map(g => h('div.row', h('b', g.id), h('span.muted', g.phase + ', season ' + g.round + ', ' + g.team_count + ' teams'),
-      h('button.small', { onclick: async () => { host = new Host(store); await host.load(g.id); setParam('g', g.id); attach(); await refresh(); } }, 'Open'))) : ['No games yet.']));
+  // 10/27: games made by an older build (or by none) are folded away and can be hidden for good with one button; the hidden ids live only in this browser.
+  const HID = 'ft:hiddenGames', hidden = () => { try { return JSON.parse(safeGet(HID) || '[]'); } catch (e) { return []; } };
+  store.listGames(30).then(gs => {
+    const hid = new Set(hidden()), mine = g => (g.settings || {}).build === BUILD.id, openBtn = g => h('button.small', { onclick: async () => { host = new Host(store); await host.load(g.id); setParam('g', g.id); attach(); await refresh(); } }, 'Open');
+    const row = g => h('div.row', h('b', g.id), h('span.muted', g.phase + ', season ' + g.round + ', ' + g.team_count + ' teams' + (g.created_at ? ', ' + new Date(g.created_at).toLocaleString() : '')), openBtn(g));
+    const cur = gs.filter(g => mine(g) && !hid.has(g.id)), old = gs.filter(g => !mine(g) && !hid.has(g.id)), nHid = gs.filter(g => hid.has(g.id)).length;
+    $('#recent').replaceChildren(
+      h('p.small.muted', 'This page is ' + buildLabel() + '. Games below were made with this build.'),
+      ...(cur.length ? cur.map(row) : [h('p', 'No games from this build yet. Create one above.')]),
+      old.length ? h('details', h('summary', 'Older games from earlier builds (' + old.length + ')'), ...old.map(row),
+        h('button.small', { onclick: () => { safeSet(HID, JSON.stringify([...hid, ...old.map(g => g.id)])); landing(); } }, 'Clear old games (hide them on this browser)')) : null,
+      nHid ? h('p.small.muted', nHid + ' older game' + (nHid > 1 ? 's' : '') + ' hidden. ', h('a', { href: '#', onclick: ev => { ev.preventDefault(); safeSet(HID, '[]'); landing(); } }, 'Show them again')) : null);
   }).catch(e => $('#recent').replaceChildren(h('span.err', friendlyError(e))));
 }
 
@@ -108,7 +119,7 @@ function teamTable() {
       const bot = host.meta && host.meta.bots && host.meta.bots[t.team_id];
       const dropped = host.meta && host.meta.dropped && host.meta.dropped.includes(t.team_id);
       return h('tr', { style: dropped ? 'opacity:.4' : '' },
-        h('td', t.team_id + ' ', h('b', t.name), ' ', tag({ house: t.house, bot: bot && !bot.house }), t.house ? h('span.chip', t.personality) : null, dropped ? h('span.chip', 'dropped (nobody joined)') : null),
+        h('td', t.team_id + ' ', h('b', t.name), ' ', tag({ house: t.house, bot: bot && !bot.house }), t.house ? h('span.chip', t.personality) : null, dropped ? h('span.chip', 'dropped (nobody joined)') : null, phase === 'lobby' && host.game.settings.fillHouse && !t.house && !claimed[t.team_id] ? h('span.chip', 'open: AI plays it if nobody joins') : null),
         h('td', dnaChips(t.brand_id)),
         h('td', t.house ? h('span.muted', 'AI') : h('b', { style: 'font:700 20px monospace' }, t.join_code)),
         h('td.n', t.house ? '' : String(claimed[t.team_id] || 0)),
@@ -187,7 +198,7 @@ function render() {
       phase === 'lobby' ? clockCard(g) : null,
       h('div.card', h('h2', 'Run'), h('div.row', ctrl), busy ? h('p.muted', 'Working...') : null),
       h('div.card', h('h2', 'Teams'), teamTable(),
-        h('p.small.muted', 'Students open the team page, type their team code and a name. Up to five seats per team. House teams are scripted, labelled HOUSE and left out of the prize ranking. Teams nobody joins are dropped at Start unless bot-fill is on.'))));
+        h('p.small.muted', 'Students open the team page and pick an open team (or type the team code) and give a name. Up to five seats per team. At Start every team nobody claimed becomes a house (AI) team: scripted, labelled HOUSE and left out of the prize ranking. With bot-fill on (testing) they become ranked BOT teams instead.'))));
   app.replaceChildren(el);
 }
 

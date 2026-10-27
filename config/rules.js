@@ -47,7 +47,7 @@ export const SHARE = {
 // Entry modes. Own: set-up cost, and half reach in the first season in that market (ownRampFirstSeason). No lead-time rule in v1.
 export const MODES = {
   ship: { setup: 0, feeShare: 0 },
-  partner: { setup: 0, feeShare: 0.2 },     // the holder of the partner seat keeps this share of the partner's revenue in that market
+  partner: { setup: 0, feeShare: 0.2 },     // paid ONLY on a carry: the seat holder earns CARRY.fee plus this share of the CARRIED team's revenue. The holder's own sales pay nobody (engine/core.mjs, holderIncome)
   own: { setup: 1.55, feeShare: 0, ownRampFirstSeason: 0.4 },
 };
 
@@ -117,8 +117,8 @@ export const CLUES = { perTeamPerSeason: 1, fromSeason: 2 };
 //   fallback: what the plan says to do if the partner bid loses.
 export const HOUSE = {
   defaultCount: 2,
-  maxCount: 10,       // 10/27: up to ten so a room of ten human teams can reach twenty
-  order: ['steady', 'local', 'bold', 'steady', 'local', 'bold', 'local', 'steady', 'bold', 'local'],       // which personality takes house seat 1, 2, 3, ...
+  maxCount: 19,       // 10/27: the lobby is one number (total teams); every slot nobody claims becomes a house team at Start, so up to total minus 1
+  order: ['steady', 'local', 'bold', 'steady', 'local', 'bold', 'local', 'steady', 'bold', 'local', 'steady', 'bold', 'local', 'steady', 'local', 'bold', 'steady', 'bold', 'local'],       // which personality takes house seat 1, 2, 3, ...
   // 10/27: a house bid is bidShare x cash x a factor drawn per team, season and market from bidSpread, so house bids are not one flat number a
   // human bid has to clear. Visible to students as a range in the bid hint (team page).
   bidSpread: [0.5, 1.1],

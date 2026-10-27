@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="ft.css">
+<link rel="stylesheet" href="ft.css?v=c89ef327">
+<script>(function(){try{var id='c89ef327',u=new URL(location.href),k='ftb',n=Number(sessionStorage.getItem(k)||0);fetch('build.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){if(j&&j.id&&j.id!==id&&n<2){sessionStorage.setItem(k,String(n+1));u.searchParams.set('b',j.id);location.replace(u.toString())}else if(j&&j.id===id){sessionStorage.removeItem(k)}}).catch(function(){})}catch(e){}})();</script>
 </head>
 <body class="page-team">
 <div id="app"><p style="padding:24px;font-family:sans-serif;color:#151411;background:#f2ede2">Loading...</p></div>
@@ -19,6 +20,6 @@ function wwModuleFail() {
   document.getElementById('app').innerHTML = '<div style="padding:32px;font:20px/1.5 sans-serif;max-width:760px"><h1>This browser blocked the page scripts.</h1><p>Chrome and Edge do not load ES modules straight from a file. Do one of these:</p><ol><li>In the pages folder run <b>node serve.mjs</b> (or double-click <b>serve.bat</b>), then open the address it prints.</li><li>Or start Chrome with <b>--allow-file-access-from-files</b>.</li></ol></div>';
 }
 </script>
-<script type="module" src="team.js" onerror="wwModuleFail()"></script>
+<script type="module" src="team.js?v=c89ef327" onerror="wwModuleFail()"></script>
 </body>
 </html>

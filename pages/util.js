@@ -1,4 +1,5 @@
 // Small helpers shared by all three pages. No game rules live here.
+import { BUILD } from './build.js?v=c89ef327';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -96,4 +97,12 @@ export function friendlyError(e) {
   const m = String((e && e.message) || e);
   if (/ww_games|schema cache|relation .* does not exist/i.test(m)) return 'The Supabase tables for this game have not been created yet. In Supabase, open project ziszzyvlevgsjiazgogr, SQL editor, paste the whole file pages/schema.sql, press Run, then reload this page. To try the game on one laptop without Supabase, add ?local=1 to the address.';
   return m;
+}
+
+// A small build id in the corner of every page (10/27), so the host can see which build this tab loaded. Added once, never blocks anything.
+export const buildLabel = () => 'build ' + BUILD.id + (BUILD.date ? ' / ' + BUILD.date : '');
+if (typeof document !== 'undefined' && document.body && !document.getElementById('buildid')) {
+  const el = document.createElement('div'); el.id = 'buildid'; el.textContent = buildLabel();
+  el.style.cssText = 'position:fixed;right:6px;bottom:3px;font:10px/1 monospace;opacity:.55;z-index:1;pointer-events:none;color:#6b665c';
+  document.body.appendChild(el);
 }

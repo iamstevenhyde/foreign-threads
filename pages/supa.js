@@ -2,10 +2,10 @@
 // openStore() returns the Supabase store in live mode and the localStorage store (store.js) in local mode,
 // so the three pages are written once against one interface.
 
-import { SUPA_URL, SUPA_ANON_KEY } from './config.js';
-import { LocalStore } from './store.js';
-import { pageMode, safeGet, safeSet, safeDel, uid } from './util.js';
-import { roleFor } from './roles.js';
+import { SUPA_URL, SUPA_ANON_KEY } from './config.js?v=c89ef327';
+import { LocalStore } from './store.js?v=c89ef327';
+import { pageMode, safeGet, safeSet, safeDel, uid } from './util.js?v=c89ef327';
+import { roleFor } from './roles.js?v=c89ef327';
 
 const SB_SRC = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 

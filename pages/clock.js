@@ -6,7 +6,7 @@
 // Steps of a season: 'decide:S', then 'reveal:S:0'..'reveal:S:N-1' (one market each), then 'reveal:S:N' (the recap: own results on the team pages and
 // carry offers for next season). The recap of the last season leads to 'final', which has no clock.
 
-import { MARKET_IDS } from '../config/markets.js';
+import { MARKET_IDS } from '../config/markets.js?v=c89ef327';
 export const MARKET_STEPS = MARKET_IDS.length;   // one reveal step per market (five since 10/27)
 
 export function stepKey(g) {

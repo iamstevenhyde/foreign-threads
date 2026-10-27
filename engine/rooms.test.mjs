@@ -165,3 +165,36 @@ test('default fallback: a partner line that never touches the fallback ships in 
   assert.equal(row(st, 1, 'T3', 'berlin').mode, 'ship', 'lost the Berlin seat, shipped by default');
   assert.equal(row(st, 1, 'T3', 'nairobi').mode, 'none', 'lost the Nairobi seat, no Ship there, sits out');
 });
+
+test('one-number lobby: total teams, students claim slots, Start turns every unclaimed slot into a house team; seats follow the total', async () => {
+  assert.ok(R.HOUSE.maxCount >= 19 && R.HOUSE.order.length >= R.HOUSE.maxCount);
+  for (const [total, humans, seats] of [[20, 10, 2], [20, 6, 2], [20, 20, 2], [8, 3, 1], [9, 2, 2]]) {
+    mem.clear();
+    const store = new LocalStore();
+    const host = await Host.create(store, { teams: total, house: 0, fillHouse: true, seed: 5 });
+    assert.equal(host.teams.length, total); assert.equal(host.teams.filter(t => t.house).length, 0, 'every slot is open in the lobby');
+    for (let i = 1; i <= humans; i++) await store.upsertSeat({ id: 'S' + i, game_id: host.gid, team_id: 'T' + i, name: 'p' + i, slot: 0, removed: false });
+    await host.start();
+    assert.equal(host.state.order.length, total);
+    assert.equal(host.state.seatsPerMarket, seats, total + ' teams give ' + seats + ' seats per city');
+    const houses = host.teams.filter(t => t.house);
+    assert.equal(houses.length, total - humans, 'unclaimed slots became house teams');
+    assert.ok(houses.every(t => t.personality && R.HOUSE.personalities[t.personality]));
+    assert.ok(host.teams.filter(t => !t.house).every(t => Number(t.team_id.slice(1)) <= humans), 'claimed slots stay human');
+    assert.deepEqual(host.meta.humans.length, humans); assert.equal(host.meta.dropped.length, 0);
+    assert.equal(host.game.house_count, total - humans);
+  }
+  // bot-fill (testing) still wins over house fill: unclaimed slots become ranked bots
+  mem.clear();
+  const store = new LocalStore();
+  const host = await Host.create(store, { teams: 6, house: 0, fillHouse: true, botFill: true, seed: 6 });
+  await store.upsertSeat({ id: 'S1', game_id: host.gid, team_id: 'T1', name: 'p', slot: 0, removed: false });
+  await host.start();
+  assert.equal(host.teams.filter(t => t.house).length, 0); assert.equal(Object.values(host.meta.bots).filter(b => !b.house).length, 5);
+  // the old two-number create still works, and an unclaimed slot is dropped as before
+  mem.clear();
+  const old = await Host.create(new LocalStore(), { teams: 3, house: 2, seed: 7 });
+  await old.store.upsertSeat({ id: 'S1', game_id: old.gid, team_id: 'T1', name: 'p', slot: 0, removed: false });
+  await old.start();
+  assert.equal(old.meta.dropped.length, 2);
+});

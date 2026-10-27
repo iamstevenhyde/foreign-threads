@@ -5,17 +5,18 @@
 // Snapshots (ww_snapshots): kind 'state' round 0 (full engine state, so an admin reload resumes), 'view' per team per season (teamView at season open),
 // 'public' per season (news + roster), 'reveal' per season (what the projector may show), 'result' per team per season (private results), 'final'.
 
-import { createGame, attachTastes, beginSeason, teamView, resolveSeason, makeOffers, standings, exportTables, rand } from '../engine/core.mjs';
-import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from '../engine/bots.mjs';
-import { BRANDS } from '../config/brands.js';
-import { HOUSE, CLOCK, SEASONS } from '../config/rules.js';
-import { MARKET_IDS } from '../config/markets.js';
-import { makeCode, makeGameId } from './util.js';
-import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js';
-import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs';
-import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js';
-import { cleanLook } from './garment.js';
-import { EXAMPLE_STEPS } from '../config/example.js';
+import { createGame, attachTastes, beginSeason, teamView, resolveSeason, makeOffers, standings, exportTables, rand } from '../engine/core.mjs?v=c89ef327';
+import { housePlan, strategyPlan, strategyOffers, STRATEGIES } from '../engine/bots.mjs?v=c89ef327';
+import { BRANDS } from '../config/brands.js?v=c89ef327';
+import { HOUSE, CLOCK, SEASONS } from '../config/rules.js?v=c89ef327';
+import { MARKET_IDS } from '../config/markets.js?v=c89ef327';
+import { makeCode, makeGameId } from './util.js?v=c89ef327';
+import { BUILD } from './build.js?v=c89ef327';
+import { drawTastes, secureInt, codeFromTastes, tastesFromCode } from '../config/taste.js?v=c89ef327';
+import { REFERENCE_TASTES } from '../engine/reference_tastes.mjs?v=c89ef327';
+import { stepKey, stepSeconds, newClock, isDue, pauseClock, resumeClock, addTime, earlyClock, restoreClock } from './clock.js?v=c89ef327';
+import { cleanLook } from './garment.js?v=c89ef327';
+import { EXAMPLE_STEPS } from '../config/example.js?v=c89ef327';
 
 // The room's hidden tastes never go to the store (Supabase or local) and never into a snapshot. They live in this browser's localStorage under the
 // room id, and the host writes down the short restore code (config/taste.js) so a cleared browser or a second laptop can pick the room up again.
@@ -40,7 +41,7 @@ export class Host {
   get gid() { return this.game.id; }
   get season() { return this.state ? this.state.season : 0; }
 
-  static async create(store, { teams = 6, house = 2, seed, botFill = false }) {
+  static async create(store, { teams = 6, house = 2, seed, botFill = false, fillHouse = false }) {
     const gid = makeGameId();
     seed = Number(seed) || (Math.floor(Math.random() * 900000) + 100);
     if (house > HOUSE.maxCount) throw new Error('at most ' + HOUSE.maxCount + ' house teams');
@@ -57,7 +58,7 @@ export class Host {
         house: isHouse, personality: isHouse ? HOUSE.order[i - teams] : '' });
     }
     await store.createGame({ id: gid, seed, team_count: teams + house, bot_count: 0, house_count: house, phase: 'lobby', round: 0, clock: null, reveal: null, rev: 0,
-      status: 'active', admin_key: makeCode(6), settings: { pool, botFill: !!botFill, aiTeams: rows.filter(r => r.house).map(r => r.team_id), seasons: SEASONS,
+      status: 'active', admin_key: makeCode(6), settings: { pool, build: BUILD.id, botFill: !!botFill, fillHouse: !!fillHouse, aiTeams: rows.filter(r => r.house).map(r => r.team_id), seasons: SEASONS,
         autoAdvance: true, clockScale: 1, savedPlanRuns: CLOCK.savedPlanRunsAtZero !== false } });
     for (const r of rows) await store.upsertTeam(r);
     const host = new Host(store);
@@ -110,14 +111,26 @@ export class Host {
     if (!this.tastes) throw new Error('This browser does not hold the room taste code. Enter the restore code first.');
     const claimed = await this.claimedTeams();
     const specs = [], bots = {}, humans = [], dropped = [], aiTeams = [];
-    let k = 0;
+    let k = 0, nHouseNow = this.teams.filter(x => x.house).length;
+    const converted = [];
     for (const t of this.teams) {
       if (t.house) { specs.push({ id: t.team_id, brandId: t.brand_id, house: true, personality: t.personality }); bots[t.team_id] = { id: t.team_id, strategy: null, personality: t.personality, house: true, mem: {} }; aiTeams.push(t.team_id); }
       else if (claimed[t.team_id]) { specs.push({ id: t.team_id, brandId: t.brand_id, house: false }); humans.push(t.team_id); }
+      else if (!this.game.settings.botFill && this.game.settings.fillHouse) {
+        // 10/27: one-number lobby. A slot nobody claimed becomes a house (AI) team now, so the room is always full.
+        const personality = HOUSE.order[nHouseNow++ % HOUSE.order.length];
+        converted.push({ ...t, house: true, personality });
+        specs.push({ id: t.team_id, brandId: t.brand_id, house: true, personality }); bots[t.team_id] = { id: t.team_id, strategy: null, personality, house: true, mem: {} }; aiTeams.push(t.team_id);
+      }
       else if (this.game.settings.botFill) { const strategy = STRATEGIES[k++ % STRATEGIES.length]; specs.push({ id: t.team_id, brandId: t.brand_id, house: false, strategy }); bots[t.team_id] = { id: t.team_id, strategy, personality: null, house: false, mem: {} }; aiTeams.push(t.team_id); }
       else dropped.push(t.team_id);
     }
     if (specs.length < 2) throw new Error('Need at least two teams. Have students join, add house teams, or turn on bot fill.');
+    if (converted.length) {
+      for (const t of converted) await this.store.upsertTeam({ game_id: this.gid, team_id: t.team_id, name: t.name, brand_id: t.brand_id, join_code: t.join_code, renamed: !!t.renamed, house: true, personality: t.personality });
+      await this._patch({ house_count: (this.game.house_count || 0) + converted.length });
+      this.teams = await this.store.getTeams(this.gid);
+    }
     this.state = createGame({ seed: this.game.seed, teams: specs, seasons: this.game.settings.seasons || SEASONS, tastes: this.tastes });
     this.meta = { bots, humans, dropped, autoSubs: {}, resultsPublished: 0 };
     await this._patch({ settings: { ...this.game.settings, aiTeams, active: specs.map(s => s.id) } });

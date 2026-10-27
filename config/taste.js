@@ -4,8 +4,8 @@
 //
 // A draw is one preferred tile per row per market. The code is the draw itself in base 32: 4 markets x (5 cuts x 4 colours x 4 logos x 4 fabrics = 320)
 // is 320^4 (about 1.05e10), 7 characters, plus one check character. There is no seed to search, and no oracle to test a guess against before a reveal.
-import { ROWS, TILES } from './tiles.js';
-import { MARKET_IDS } from './markets.js';
+import { ROWS, TILES } from './tiles.js?v=c89ef327';
+import { MARKET_IDS } from './markets.js?v=c89ef327';
 
 const SIZES = ROWS.map(r => TILES[r].length);
 const PER_MARKET = SIZES.reduce((a, b) => a * b, 1);          // 320

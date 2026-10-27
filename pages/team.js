@@ -3,15 +3,15 @@
 // the season's plan, and a round-0 row that holds the team's brand mark and colour (cosmetic, read by the projector).
 // Layout (10/24 redesign): tabs Studio / Markets / Rival Lookbook, the news as "The Thread", and a dock along the bottom with cash, what the plan
 // holds, what is still open, the clock and the lock button.
-import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat } from './supa.js';
-import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js';
-import { clockLeft } from './clock.js';
-import { exampleScreen } from './example.js';
-import { validateWith } from '../engine/core.mjs';
-import { BID_HINT, defaultFallback } from '../config/rules.js';
+import { openStore, savedSeat, resumeSeat, lookupCode, takeNewSeat, takeOverSeat, heartbeat } from './supa.js?v=c89ef327';
+import { h, $, $$, params, setParam, toast, debounce, mmss, friendlyError, safeGet, safeSet } from './util.js?v=c89ef327';
+import { clockLeft } from './clock.js?v=c89ef327';
+import { exampleScreen } from './example.js?v=c89ef327';
+import { validateWith } from '../engine/core.mjs?v=c89ef327';
+import { BID_HINT, defaultFallback } from '../config/rules.js?v=c89ef327';
 import { ROWS, ROW_LABEL, TILES, tileLabel, MARKETS, MARKET_IDS, BRANDS, BRAND_BY_ID, dnaState, money, money1, pctf,
-  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js';
-import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js';
+  MODE_LABEL, PRICE_LABEL, GAME_TITLE, garmentEl, markEl, tilesCaps, thumbSrc, lazyImg, tag } from './ui.js?v=c89ef327';
+import { garmentSVG, cleanLook, cleanStyle, defaultName, TRIMS, PATTERNS, ARTWORK, MARKS, BRAND_COLOURS, swatchSVG, fabricSVG, patternSVG, trimHex, markSVG } from './garment.js?v=c89ef327';
 
 const app = $('#app');
 let planP = null, store, seat = null, game = null, team = null, allTeams = [], view = null, result = null, finalSnap = null, plan = null, why = '', locked = false, notes = [],
@@ -47,7 +47,16 @@ function joinScreen(msg, resume) {
       h('input#nm', { placeholder: 'First name', onkeydown: ev => { if (ev.key === 'Enter') go(); } }),
       msg ? h('p.err', msg) : null,
       h('button.btn.primary.wide', { onclick: go }, 'Join your brand')),
+    hint ? h('div.join-card#pick', h('p.lbl', 'Or pick a team')) : null,
     resume ? h('div.join-card', h('p', 'You already have this seat on another screen.'), h('button.btn', { onclick: async () => { await takeOverSeat(store, resume.game, resume.seat); seat = (await store.getSeats(resume.game.id)).find(x => x.id === resume.seat.id); start(); } }, 'Take over this seat here')) : null));
+  if (hint) Promise.all([store.getTeams(hint), store.getSeats(hint), store.getGame(hint)]).then(([ts, seats, g]) => {
+    const box = $('#pick'); if (!box || !ts) return;
+    const n = {}; for (const x of seats || []) if (!x.removed) n[x.team_id] = (n[x.team_id] || 0) + 1;
+    const open = ts.filter(t => !t.house);
+    if (!open.length || (g && g.phase !== 'lobby')) { box.remove(); return; }
+    box.append(h('div.pickl', open.map(t => h('button.btn' + (n[t.team_id] ? '' : '.primary'), { onclick: () => { $('#code').value = t.join_code; go(); } },
+      t.name + (n[t.team_id] ? ' (' + n[t.team_id] + ' joined)' : ' (open)')))));
+  }).catch(() => { const b = $('#pick'); if (b) b.remove(); });
 }
 
 // ---------- data ----------
@@ -399,7 +408,7 @@ function costsList(m) {
     R.walkShare ? row('Partner contracts', 'No court to enforce them: a partner keeps ' + Math.round(R.walkShare * 100) + '% of your sales') : null,
     row('What buyers weigh', ROWS.slice().sort((a, b) => pm.weights[b] - pm.weights[a]).map(r => ROW_LABEL[r] + ' ' + Math.round(pm.weights[r] * 100) + '%').join(' · ') + ' (public)'),
     row('Order rows come to light', pm.revealOrder.map(r => ROW_LABEL[r]).join(', ') + '. The first ' + pm.startVisible + ' show from the start.'),
-    row('Local rival', pm.incumbent.name + ' sells a near-perfect local fit at ' + pm.incumbent.price + ' price'),
+    row('Local firm (a computer seller)', pm.incumbent.name + ' sells a garment that matches the taste of this city about ' + Math.round((pm.incumbent.fit || 0.65) * 100) + '% as well as a perfect one, at ' + pm.incumbent.price + ' price. It takes its buyers first; your rivals are the other teams.'),
     row('Last season', lastHolder ? lastHolder + (lastHolders.length > 1 ? ' held the partner seats; ' : ' held the partner seat; ') + (view.lastCrowd[m] || 0) + ' sellers' : view.season > 1 ? 'Nobody held the partner seat; ' + (view.lastCrowd[m] || 0) + ' sellers' : 'No history yet'));
 }
 function modeCards(m) {
@@ -422,7 +431,7 @@ function modeCards(m) {
   const cards = [
     { k: 'none', t: 'Stay out', c: '$0 committed', d: 'Keep focus elsewhere. You learn nothing new here this season.' },
     { k: 'ship', t: 'Ship in', c: 'Tax ' + tax + '%' + (pm.rules.dutyShipped ? ' · duty ' + Math.round(pm.rules.dutyShipped * 100) + '%' : ' · no duty'), d: 'Reaches ' + ship + '% as many buyers as a partner. You keep every sale.', off: !pm.rules.modes.includes('ship') && 'No formal distributor here, so nothing can be shipped in.' },
-    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach and one taste row the moment you win. ' + seatWords() + ' Each winning bid is PAID (spent, not held); losers are refunded and their fallback runs (ship in by default where that is open).' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
+    { k: 'partner', t: 'Local partner', c: 'Tax ' + taxP + '% · sealed bid, max ' + money(view.bidCap), d: 'Full reach (100% of buyers, against ' + ship + '% by shipping and ' + own + '% for an own shop) and one taste row the moment you win. A rival team can ask you to carry its line next season: you earn ' + money1(view.pub.CARRY.fee) + ' plus ' + Math.round(view.pub.MODES.partner.feeShare * 100) + '% of its sales there. ' + seatWords() + ' Each winning bid is PAID (spent, not held); losers are refunded and their fallback runs (ship in by default where that is open).' + (pm.rules.walkShare ? ' Here the partner keeps ' + Math.round(pm.rules.walkShare * 100) + '% of sales.' : '') },
     { k: 'own', t: 'Own shop', c: (view.owned[m] ? 'Set-up already paid' : 'Set-up ' + money(view.pub.MODES.own.setup)) + ' · tax ' + tax + '%', d: 'Reaches ' + own + '% of a partner, only ' + ramp + '% in your first season here. Paid at once, no partner share.' },
   ];
   if (offer) cards.push({ k: 'carried', t: 'Carried by ' + brandName(offer.holder), c: 'Fee ' + money(view.pub.CARRY.fee) + ' · tax ' + taxP + '%', d: 'Rides on their partner seat if they win it again. They see your design.' });
